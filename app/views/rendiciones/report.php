@@ -10,13 +10,13 @@ $totalEgresos = (float) ($summary['total_egresos'] ?? 0);
 $balance = $totalIngresos - $totalEgresos;
 
 $maxTypeValues = array_values(array_map(static fn($value): float => (float) $value, $byType ?: [0]));
-$maxType = max(1, ...$maxTypeValues);
+$sumType = max(1.0, array_sum($maxTypeValues));
 $originTotals = [];
 foreach ($byOrigin as $origin => $values) {
     $originTotals[$origin] = (float) (($values['ingreso'] ?? 0) + ($values['egreso'] ?? 0));
 }
 $maxOriginValues = array_values(array_map(static fn($value): float => (float) $value, $originTotals ?: [0]));
-$maxOrigin = max(1, ...$maxOriginValues);
+$sumOrigin = max(1.0, array_sum($maxOriginValues));
 ?>
 
 <style>
@@ -40,38 +40,25 @@ $maxOrigin = max(1, ...$maxOriginValues);
   .report-title { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--corp-primary); letter-spacing: .15px; }
   .report-subtitle { font-size: .72rem; color: var(--corp-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: .65px; }
   .report-meta { font-size: .78rem; color: var(--corp-muted); line-height: 1.25; }
-  .kpi-grid { display:grid; grid-template-columns: repeat(4,minmax(130px,1fr)); gap:.5rem; margin-bottom:.7rem; }
-  .kpi {
-    border:1px solid var(--corp-border); border-radius:.5rem; padding:.55rem .65rem; background:#fff;
-    box-shadow: 0 1px 2px rgba(15, 58, 104, .06);
+  .report-section { margin-bottom: .6rem; }
+  .section-title {
+    margin: 0 0 .2rem 0; font-size: .8rem; font-weight: 700; color: var(--corp-primary);
+    text-transform: uppercase; letter-spacing: .45px;
   }
-  .kpi .label { font-size:.68rem; color:var(--corp-muted); text-transform:uppercase; letter-spacing:.45px; }
-  .kpi .value { font-size:1rem; font-weight:700; color: var(--corp-primary); line-height: 1.1; }
-  .chart-grid { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; margin-bottom:.7rem; }
-  .chart-card {
-    border:1px solid var(--corp-border); border-radius:.55rem; padding:.6rem; background:#fff;
-    box-shadow: 0 1px 2px rgba(15, 58, 104, .05);
-  }
-  .chart-title { font-size: .85rem; font-weight:700; margin-bottom:.4rem; color: var(--corp-primary); }
-  .mini-bars { display:grid; gap:.22rem; }
-  .bar-row { display:grid; grid-template-columns:110px 1fr 90px; align-items:center; gap:.35rem; font-size:.76rem; }
-  .bar-track { background:#e8eef5; border-radius:999px; height:7px; overflow:hidden; }
-  .bar-fill { height:100%; background:var(--corp-secondary); border-radius:999px; }
-  .bar-fill.egreso { background:var(--corp-negative); }
-  .bar-fill.origin { background:#0f766e; }
-  .month-table th, .month-table td { font-size:.75rem; padding: .35rem .45rem; }
-  .report-card { border:1px solid var(--corp-border); border-radius:.55rem; overflow:hidden; box-shadow: 0 1px 2px rgba(15, 58, 104, .05); }
-  .report-card .card-header { background: var(--corp-soft); border-bottom:1px solid var(--corp-border); color: var(--corp-primary); }
-  .table thead th { background: #f8fbff; color: #1e3a5f; font-weight: 700; border-bottom-color: #dbe5f0; font-size: .74rem; padding: .4rem .5rem; }
-  .table tbody td { padding: .36rem .5rem; font-size: .75rem; }
+  .table-wrap { border: 1px solid var(--corp-border); border-radius: .42rem; overflow: hidden; }
+  .summary-table td { font-size: .75rem; padding: .35rem .5rem; }
+  .summary-table td:first-child { font-weight: 600; color: #1e3a5f; width: 25%; background: #f8fbff; }
+  .split-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; }
+  .month-table th, .month-table td { font-size:.74rem; padding: .34rem .45rem; }
+  .table thead th { background: #f8fbff; color: #1e3a5f; font-weight: 700; border-bottom-color: #dbe5f0; font-size: .73rem; padding: .38rem .48rem; }
+  .table tbody td { padding: .34rem .48rem; font-size: .74rem; }
   @media print {
     @page { size: A4 portrait; margin: 8mm; }
     .no-print { display:none !important; }
     body { background:#fff; }
     .report-wrap { padding:0; max-width: 100%; }
-    .report-header, .kpi, .chart-card, .report-card { box-shadow: none; }
-    .kpi-grid, .chart-grid { break-inside: avoid; page-break-inside: avoid; }
-    .report-card { break-inside: auto; page-break-inside: auto; }
+    .report-header, .table-wrap { box-shadow: none; }
+    .split-grid, .table-wrap { break-inside: avoid; page-break-inside: avoid; }
   }
 </style>
 
@@ -96,94 +83,114 @@ $maxOrigin = max(1, ...$maxOriginValues);
     </div>
   </div>
 
-  <section class="kpi-grid">
-    <article class="kpi"><div class="label">Registros</div><div class="value"><?= (int) ($summary['total_registros'] ?? 0) ?></div></article>
-    <article class="kpi"><div class="label">Ingresos</div><div class="value">$<?= number_format($totalIngresos, 0, ',', '.') ?></div></article>
-    <article class="kpi"><div class="label">Egresos</div><div class="value">$<?= number_format($totalEgresos, 0, ',', '.') ?></div></article>
-    <article class="kpi"><div class="label">Balance</div><div class="value" style="color:<?= $balance >= 0 ? '#166534' : '#b91c1c' ?>">$<?= number_format($balance, 0, ',', '.') ?></div></article>
+  <section class="report-section">
+    <h3 class="section-title">Resumen ejecutivo</h3>
+    <div class="table-wrap">
+      <table class="table table-sm mb-0 summary-table">
+        <tbody>
+          <tr>
+            <td>Registros</td>
+            <td><?= (int) ($summary['total_registros'] ?? 0) ?></td>
+            <td>Ingresos</td>
+            <td>$<?= number_format($totalIngresos, 0, ',', '.') ?></td>
+          </tr>
+          <tr>
+            <td>Egresos</td>
+            <td>$<?= number_format($totalEgresos, 0, ',', '.') ?></td>
+            <td>Balance</td>
+            <td style="font-weight:700; color:<?= $balance >= 0 ? '#166534' : '#b91c1c' ?>">$<?= number_format($balance, 0, ',', '.') ?></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 
-  <section class="chart-grid">
-    <article class="chart-card">
-      <div class="chart-title">Gráfico 1 · Distribución por tipo de movimiento</div>
-      <div class="mini-bars">
-        <?php foreach ($byType as $type => $value): ?>
-          <?php $width = max(2, (int) round((((float) $value) / $maxType) * 100)); ?>
-          <div class="bar-row">
-            <div><?= htmlspecialchars(ucfirst((string) $type)) ?></div>
-            <div class="bar-track"><div class="bar-fill <?= $type === 'egreso' ? 'egreso' : '' ?>" style="width: <?= $width ?>%"></div></div>
-            <div class="text-end">$<?= number_format((float) $value, 0, ',', '.') ?></div>
-          </div>
-        <?php endforeach; ?>
-      </div>
-    </article>
-
-    <article class="chart-card">
-      <div class="chart-title">Gráfico 2 · Composición por origen</div>
-      <div class="mini-bars">
-        <?php foreach ($originTotals as $origin => $value): ?>
-          <?php $width = max(2, (int) round((((float) $value) / $maxOrigin) * 100)); ?>
-          <div class="bar-row">
-            <div><?= htmlspecialchars((string) $origin) ?></div>
-            <div class="bar-track"><div class="bar-fill origin" style="width: <?= $width ?>%"></div></div>
-            <div class="text-end">$<?= number_format((float) $value, 0, ',', '.') ?></div>
-          </div>
-        <?php endforeach; ?>
-      </div>
-    </article>
-  </section>
-
-  <section class="card mb-3 report-card">
-    <div class="card-header py-2"><strong>Evolución mensual (filtrada)</strong></div>
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-sm table-striped mb-0 month-table">
-          <thead><tr><th>Mes</th><th class="text-end">Ingresos</th><th class="text-end">Egresos</th><th class="text-end">Balance</th></tr></thead>
+  <section class="report-section split-grid">
+    <div>
+      <h3 class="section-title">Distribución por tipo</h3>
+      <div class="table-wrap">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Tipo</th><th class="text-end">Monto</th><th class="text-end">%</th></tr></thead>
           <tbody>
-            <?php if (empty($byMonth)): ?>
-              <tr><td colspan="4" class="text-center py-3">Sin datos en el período seleccionado.</td></tr>
-            <?php else: ?>
-              <?php foreach ($byMonth as $month => $totals): ?>
-                <?php $monthBalance = (float) ($totals['ingreso'] ?? 0) - (float) ($totals['egreso'] ?? 0); ?>
-                <tr>
-                  <td><?= htmlspecialchars((string) $month) ?></td>
-                  <td class="text-end">$<?= number_format((float) ($totals['ingreso'] ?? 0), 0, ',', '.') ?></td>
-                  <td class="text-end">$<?= number_format((float) ($totals['egreso'] ?? 0), 0, ',', '.') ?></td>
-                  <td class="text-end" style="color:<?= $monthBalance >= 0 ? '#166534' : '#b91c1c' ?>">$<?= number_format($monthBalance, 0, ',', '.') ?></td>
-                </tr>
-              <?php endforeach; ?>
-            <?php endif; ?>
+            <?php foreach ($byType as $type => $value): ?>
+              <?php $percent = $sumType > 0 ? ((((float) $value) / $sumType) * 100) : 0; ?>
+              <tr>
+                <td><?= htmlspecialchars(ucfirst((string) $type)) ?></td>
+                <td class="text-end">$<?= number_format((float) $value, 0, ',', '.') ?></td>
+                <td class="text-end"><?= number_format($percent, 1, ',', '.') ?>%</td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div>
+      <h3 class="section-title">Composición por origen</h3>
+      <div class="table-wrap">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Origen</th><th class="text-end">Monto</th><th class="text-end">%</th></tr></thead>
+          <tbody>
+            <?php foreach ($originTotals as $origin => $value): ?>
+              <?php $percent = $sumOrigin > 0 ? ((((float) $value) / $sumOrigin) * 100) : 0; ?>
+              <tr>
+                <td><?= htmlspecialchars((string) $origin) ?></td>
+                <td class="text-end">$<?= number_format((float) $value, 0, ',', '.') ?></td>
+                <td class="text-end"><?= number_format($percent, 1, ',', '.') ?>%</td>
+              </tr>
+            <?php endforeach; ?>
           </tbody>
         </table>
       </div>
     </div>
   </section>
 
-  <section class="card report-card">
-    <div class="card-header py-2"><strong>Detalle de movimientos filtrados</strong></div>
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0">
-          <thead><tr><th>#</th><th>Fecha</th><th>Tipo</th><th>Origen</th><th>Descripción</th><th class="text-end">Ingreso</th><th class="text-end">Egreso</th></tr></thead>
-          <tbody>
-            <?php if (empty($rows)): ?>
-              <tr><td colspan="7" class="text-center py-3">No hay movimientos para este filtro.</td></tr>
-            <?php else: ?>
-              <?php foreach ($rows as $i => $row): ?>
-                <tr>
-                  <td><?= (int) ($i + 1) ?></td>
-                  <td><?= htmlspecialchars((string) ($row['fecha'] ?? '')) ?></td>
-                  <td><?= htmlspecialchars((string) ($row['tipo_movimiento'] ?? '')) ?></td>
-                  <td><?= htmlspecialchars((string) ($row['origen_modulo'] ?? '')) ?></td>
-                  <td><?= htmlspecialchars((string) ($row['descripcion'] ?? '')) ?></td>
-                  <td class="text-end">$<?= number_format((float) ($row['ingreso'] ?? 0), 0, ',', '.') ?></td>
-                  <td class="text-end">$<?= number_format((float) ($row['egreso'] ?? 0), 0, ',', '.') ?></td>
-                </tr>
-              <?php endforeach; ?>
-            <?php endif; ?>
-          </tbody>
-        </table>
-      </div>
+  <section class="report-section">
+    <h3 class="section-title">Evolución mensual (filtrada)</h3>
+    <div class="table-wrap table-responsive">
+      <table class="table table-sm table-striped mb-0 month-table">
+        <thead><tr><th>Mes</th><th class="text-end">Ingresos</th><th class="text-end">Egresos</th><th class="text-end">Balance</th></tr></thead>
+        <tbody>
+          <?php if (empty($byMonth)): ?>
+            <tr><td colspan="4" class="text-center py-3">Sin datos en el período seleccionado.</td></tr>
+          <?php else: ?>
+            <?php foreach ($byMonth as $month => $totals): ?>
+              <?php $monthBalance = (float) ($totals['ingreso'] ?? 0) - (float) ($totals['egreso'] ?? 0); ?>
+              <tr>
+                <td><?= htmlspecialchars((string) $month) ?></td>
+                <td class="text-end">$<?= number_format((float) ($totals['ingreso'] ?? 0), 0, ',', '.') ?></td>
+                <td class="text-end">$<?= number_format((float) ($totals['egreso'] ?? 0), 0, ',', '.') ?></td>
+                <td class="text-end" style="color:<?= $monthBalance >= 0 ? '#166534' : '#b91c1c' ?>">$<?= number_format($monthBalance, 0, ',', '.') ?></td>
+              </tr>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="report-section">
+    <h3 class="section-title">Detalle de movimientos filtrados</h3>
+    <div class="table-wrap table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead><tr><th>#</th><th>Fecha</th><th>Tipo</th><th>Origen</th><th>Descripción</th><th class="text-end">Ingreso</th><th class="text-end">Egreso</th></tr></thead>
+        <tbody>
+          <?php if (empty($rows)): ?>
+            <tr><td colspan="7" class="text-center py-3">No hay movimientos para este filtro.</td></tr>
+          <?php else: ?>
+            <?php foreach ($rows as $i => $row): ?>
+              <tr>
+                <td><?= (int) ($i + 1) ?></td>
+                <td><?= htmlspecialchars((string) ($row['fecha'] ?? '')) ?></td>
+                <td><?= htmlspecialchars((string) ($row['tipo_movimiento'] ?? '')) ?></td>
+                <td><?= htmlspecialchars((string) ($row['origen_modulo'] ?? '')) ?></td>
+                <td><?= htmlspecialchars((string) ($row['descripcion'] ?? '')) ?></td>
+                <td class="text-end">$<?= number_format((float) ($row['ingreso'] ?? 0), 0, ',', '.') ?></td>
+                <td class="text-end">$<?= number_format((float) ($row['egreso'] ?? 0), 0, ',', '.') ?></td>
+              </tr>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </tbody>
+      </table>
     </div>
   </section>
 </div>
