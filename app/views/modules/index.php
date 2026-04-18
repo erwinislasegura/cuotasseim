@@ -108,6 +108,16 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
                 $fieldClass = 'col-md-6 col-lg-4';
               }
             }
+
+            if (($route ?? '') === 'aportes') {
+              if ((string) $field === 'socio_id') {
+                $fieldClass = 'col-md-8';
+              } elseif ((string) $field === 'monto') {
+                $fieldClass = 'col-md-4';
+              } elseif ((string) $field === 'comentario') {
+                $fieldClass = 'col-12';
+              }
+            }
           ?>
           <div class="<?= htmlspecialchars($fieldClass) ?>">
             <label class="form-label"><?= htmlspecialchars($fieldLabel) ?></label>
@@ -142,7 +152,11 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
                 <small class="text-muted">Puedes seleccionar más de un plan (Ctrl/Cmd + clic).</small>
               <?php endif; ?>
             <?php else: ?>
-              <input type="<?= htmlspecialchars($fieldType) ?>" name="<?= htmlspecialchars((string) $field) ?>" value="<?= htmlspecialchars($value) ?>" class="form-control form-control-sm" <?= $isReadOnlyField ? 'readonly' : '' ?> <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>
+              <?php if ($fieldType === 'textarea'): ?>
+                <textarea name="<?= htmlspecialchars((string) $field) ?>" class="form-control form-control-sm" rows="3" <?= $isReadOnlyField ? 'readonly' : '' ?> <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>><?= htmlspecialchars($value) ?></textarea>
+              <?php else: ?>
+                <input type="<?= htmlspecialchars($fieldType) ?>" name="<?= htmlspecialchars((string) $field) ?>" value="<?= htmlspecialchars($value) ?>" class="form-control form-control-sm" <?= $isReadOnlyField ? 'readonly' : '' ?> <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>
+              <?php endif; ?>
             <?php endif; ?>
           </div>
         <?php endforeach; ?>
@@ -153,6 +167,19 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
           <a href="<?= htmlspecialchars(url($route ?? '')) ?>" class="btn btn-outline-secondary btn-sm">Cancelar</a>
         </div>
       </form>
+
+      <?php if (($route ?? '') === 'aportes'): ?>
+        <div id="aporteSocioInfo" class="alert alert-light border small mt-3 mb-0 d-none">
+          <div class="fw-semibold mb-2">Datos del socio seleccionado</div>
+          <div class="row g-2">
+            <div class="col-md-6"><span class="text-muted">Nombre:</span> <span data-socio-field="nombre_completo">-</span></div>
+            <div class="col-md-6"><span class="text-muted">N° Socio:</span> <span data-socio-field="numero_socio">-</span></div>
+            <div class="col-md-6"><span class="text-muted">RUT:</span> <span data-socio-field="rut">-</span></div>
+            <div class="col-md-6"><span class="text-muted">Teléfono:</span> <span data-socio-field="telefono">-</span></div>
+            <div class="col-12"><span class="text-muted">Correo:</span> <span data-socio-field="correo">-</span></div>
+          </div>
+        </div>
+      <?php endif; ?>
     </div>
   </div>
 <?php endif; ?>
@@ -176,6 +203,40 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
       nombres.addEventListener('input', actualizarNombreCompleto);
       apellidos.addEventListener('input', actualizarNombreCompleto);
       actualizarNombreCompleto();
+    });
+  </script>
+<?php endif; ?>
+
+<?php if (($route ?? '') === 'aportes'): ?>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const socioSelect = document.querySelector('select[name="socio_id"]');
+      const socioInfo = document.getElementById('aporteSocioInfo');
+      const sociosData = <?= json_encode(($formMeta['socios_data'] ?? []), JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_TAG) ?>;
+
+      if (!socioSelect || !socioInfo) {
+        return;
+      }
+
+      const updateSocioInfo = function () {
+        const socioId = socioSelect.value;
+        const socio = sociosData[socioId] || null;
+
+        if (!socio) {
+          socioInfo.classList.add('d-none');
+          return;
+        }
+
+        socioInfo.classList.remove('d-none');
+        socioInfo.querySelectorAll('[data-socio-field]').forEach(function (node) {
+          const field = node.getAttribute('data-socio-field');
+          const value = socio[field] || '';
+          node.textContent = value !== '' ? value : '-';
+        });
+      };
+
+      socioSelect.addEventListener('change', updateSocioInfo);
+      updateSocioInfo();
     });
   </script>
 <?php endif; ?>
