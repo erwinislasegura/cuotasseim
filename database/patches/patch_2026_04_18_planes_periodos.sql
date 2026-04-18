@@ -28,4 +28,14 @@ ALTER TABLE periodos
 ALTER TABLE periodos
     DROP INDEX uk_periodo;
 
+CREATE TABLE IF NOT EXISTS socio_planes (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    socio_id BIGINT UNSIGNED NOT NULL,
+    periodo_id BIGINT UNSIGNED NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_socio_plan (socio_id, periodo_id),
+    CONSTRAINT fk_socio_planes_socio FOREIGN KEY (socio_id) REFERENCES socios(id),
+    CONSTRAINT fk_socio_planes_periodo FOREIGN KEY (periodo_id) REFERENCES periodos(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 COMMIT;

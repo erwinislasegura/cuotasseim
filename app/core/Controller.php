@@ -151,6 +151,8 @@ abstract class Controller
                 if (!empty($availableFormFields)) {
                     $formFields = $availableFormFields;
                 }
+                $formFields[] = 'planes_ids';
+                $formFields = array_values(array_unique($formFields));
 
                 $formMeta = [
                     'types' => [
@@ -171,6 +173,10 @@ abstract class Controller
                         'tipo_socio_id' => 'Tipo socio',
                         'estado_socio_id' => 'Estado socio',
                         'fecha_ingreso' => 'Fecha de inscripción como socio',
+                        'planes_ids' => 'Planes asociados',
+                    ],
+                    'multiple' => [
+                        'planes_ids' => true,
                     ],
                 ];
                 $columnLabels = $formMeta['labels'];
@@ -185,9 +191,26 @@ abstract class Controller
                     'value' => (string) $item['id'],
                     'label' => (string) $item['nombre'],
                 ], $estadoSocioStmt->fetchAll());
+                $planesStmt = Database::connection()->query('SELECT id, nombre_periodo, tipo_periodo, monto_a_pagar FROM periodos ORDER BY nombre_periodo ASC');
+                $formMeta['options']['planes_ids'] = array_map(static function (array $item): array {
+                    return [
+                        'value' => (string) $item['id'],
+                        'label' => sprintf(
+                            '%s · %s · $%s',
+                            (string) ($item['nombre_periodo'] ?? ''),
+                            ucfirst((string) ($item['tipo_periodo'] ?? '')),
+                            number_format((float) ($item['monto_a_pagar'] ?? 0), 0, ',', '.')
+                        ),
+                    ];
+                }, $planesStmt->fetchAll());
 
                 if ($currentRecord === null) {
-                    $currentRecord = ['numero_socio' => ModuleCatalog::nextSocioNumber()];
+                    $currentRecord = [
+                        'numero_socio' => ModuleCatalog::nextSocioNumber(),
+                        'planes_ids' => [],
+                    ];
+                } else {
+                    $currentRecord['planes_ids'] = ModuleCatalog::fetchSocioPlanes((int) ($currentRecord['id'] ?? 0));
                 }
             }
 
