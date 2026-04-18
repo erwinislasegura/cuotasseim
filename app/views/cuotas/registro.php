@@ -95,6 +95,11 @@
     <div class="card-header py-2"><strong class="card-title mb-0">Cuota del periodo actual / por vencer</strong></div>
     <div class="card-body py-3">
       <?php if (!empty($cuotaPorVencer)): ?>
+      <?php if ((int) ($cuotaPorVencer['es_referencia_plan'] ?? 0) === 1): ?>
+        <div class="alert alert-warning small mb-3">
+          Esta cuota se muestra desde el plan actual del socio para que tengas algo que cobrar, aunque aún no exista un registro generado en la tabla de cuotas.
+        </div>
+      <?php endif; ?>
         <div class="table-responsive">
           <table class="table table-sm table-striped mb-0">
             <thead>
