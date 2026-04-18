@@ -75,6 +75,23 @@ $reportQueryParams = array_merge([
       <div class="label">Estado filtrado</div>
       <div class="value"><?= htmlspecialchars($statusOptions[(string) ($status ?? '')] ?? 'Todos') ?></div>
     </article>
+    <?php if (($route ?? '') === 'rendiciones'): ?>
+      <article class="quick-summary">
+        <div class="label">Ingresos (filtrados)</div>
+        <div class="value">$<?= number_format((float) ($moduleSummary['total_ingresos'] ?? 0), 0, ',', '.') ?></div>
+      </article>
+      <article class="quick-summary">
+        <div class="label">Egresos (filtrados)</div>
+        <div class="value">$<?= number_format((float) ($moduleSummary['total_egresos'] ?? 0), 0, ',', '.') ?></div>
+      </article>
+      <article class="quick-summary">
+        <div class="label">Balance</div>
+        <?php $balanceResumen = (float) ($moduleSummary['balance'] ?? 0); ?>
+        <div class="value" style="color:<?= $balanceResumen >= 0 ? '#15803d' : '#b91c1c' ?>">
+          $<?= number_format($balanceResumen, 0, ',', '.') ?>
+        </div>
+      </article>
+    <?php endif; ?>
   </div>
 <?php endif; ?>
 

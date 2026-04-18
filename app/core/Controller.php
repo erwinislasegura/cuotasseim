@@ -248,7 +248,11 @@ abstract class Controller
                 'from' => $from,
                 'to' => $to,
                 'rows' => $rendicionesResult['rows'],
-                'displayRows' => $rendicionesResult['rows'],
+                'displayRows' => array_map(static function (array $row): array {
+                    $row['ingreso'] = '$' . number_format((float) ($row['ingreso'] ?? 0), 0, ',', '.');
+                    $row['egreso'] = '$' . number_format((float) ($row['egreso'] ?? 0), 0, ',', '.');
+                    return $row;
+                }, $rendicionesResult['rows']),
                 'columns' => ['fecha', 'tipo_movimiento', 'origen_modulo', 'descripcion', 'ingreso', 'egreso'],
                 'formFields' => [],
                 'statusField' => 'tipo_movimiento',
@@ -257,6 +261,9 @@ abstract class Controller
                     'total' => $rendicionesResult['total'],
                     'visibles' => count($rendicionesResult['rows']),
                     'status_counts' => $rendicionesResult['status_counts'],
+                    'total_ingresos' => $rendicionesResult['total_ingresos'],
+                    'total_egresos' => $rendicionesResult['total_egresos'],
+                    'balance' => $rendicionesResult['balance'],
                 ],
                 'total' => $rendicionesResult['total'],
                 'page' => $page,
@@ -871,7 +878,7 @@ abstract class Controller
         }
 
         $sql = "
-            SELECT CONCAT('P-', p.id) AS row_id, p.fecha_pago AS fecha, 'ingreso' AS tipo_movimiento, 'pago_cuota' AS origen_modulo,
+            SELECT CONCAT('P-', p.id) AS row_id, p.fecha_pago AS fecha, 'ingreso' AS tipo_movimiento, 'Pago de cuota' AS origen_modulo,
                    CONCAT('Pago cuota ', COALESCE(p.numero_comprobante, CONCAT('#', p.id)), ' · ', COALESCE(s.nombre_completo, 'Socio')) AS descripcion,
                    p.monto_total AS ingreso, 0 AS egreso, s.id AS socio_id, COALESCE(s.rut, '') AS socio_rut, COALESCE(s.nombre_completo, '') AS socio_nombre
             FROM pagos p
@@ -880,7 +887,7 @@ abstract class Controller
 
             UNION ALL
 
-            SELECT CONCAT('A-', a.id) AS row_id, a.fecha_aporte AS fecha, 'ingreso' AS tipo_movimiento, 'aporte' AS origen_modulo,
+            SELECT CONCAT('A-', a.id) AS row_id, a.fecha_aporte AS fecha, 'ingreso' AS tipo_movimiento, 'Aporte' AS origen_modulo,
                    CONCAT('Aporte ', COALESCE(a.comentario, a.descripcion, ''), ' · ', COALESCE(s.nombre_completo, a.nombre_aportante, 'Aportante')) AS descripcion,
                    a.monto AS ingreso, 0 AS egreso, COALESCE(s.id, 0) AS socio_id, COALESCE(s.rut, '') AS socio_rut, COALESCE(s.nombre_completo, a.nombre_aportante, '') AS socio_nombre
             FROM aportes a
@@ -889,7 +896,7 @@ abstract class Controller
 
             UNION ALL
 
-            SELECT CONCAT('E-', e.id) AS row_id, e.fecha AS fecha, 'egreso' AS tipo_movimiento, 'retiro' AS origen_modulo,
+            SELECT CONCAT('E-', e.id) AS row_id, e.fecha AS fecha, 'egreso' AS tipo_movimiento, 'Retiro' AS origen_modulo,
                    CONCAT('Retiro ', COALESCE(e.numero_documento, CONCAT('#', e.id)), ' · ', COALESCE(e.proveedor_destinatario, ''), ' · ', COALESCE(e.descripcion, '')) AS descripcion,
                    0 AS ingreso, e.monto AS egreso, 0 AS socio_id, '' AS socio_rut, COALESCE(e.proveedor_destinatario, '') AS socio_nombre
             FROM egresos e
@@ -962,12 +969,16 @@ abstract class Controller
         $rows = array_slice($filtered, $offset, $perPage);
 
         $statusCounts = ['ingreso' => 0, 'egreso' => 0];
+        $totalIngresos = 0.0;
+        $totalEgresos = 0.0;
         foreach ($filtered as $row) {
             $type = (string) ($row['tipo_movimiento'] ?? '');
             if (!isset($statusCounts[$type])) {
                 $statusCounts[$type] = 0;
             }
             $statusCounts[$type]++;
+            $totalIngresos += (float) ($row['ingreso'] ?? 0);
+            $totalEgresos += (float) ($row['egreso'] ?? 0);
         }
 
         return [
@@ -976,6 +987,9 @@ abstract class Controller
             'total' => $total,
             'pages' => $pages,
             'status_counts' => $statusCounts,
+            'total_ingresos' => $totalIngresos,
+            'total_egresos' => $totalEgresos,
+            'balance' => $totalIngresos - $totalEgresos,
         ];
     }
 }
