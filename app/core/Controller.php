@@ -36,11 +36,14 @@ abstract class Controller
         Session::start();
 
         $query = trim((string) ($_GET['q'] ?? ''));
+        $status = trim((string) ($_GET['status'] ?? ''));
+        $from = trim((string) ($_GET['from'] ?? ''));
+        $to = trim((string) ($_GET['to'] ?? ''));
         $page = max(1, (int) ($_GET['page'] ?? 1));
         $perPage = 10;
 
         try {
-            $data = ModuleCatalog::fetchData($config, $query, $page, $perPage);
+            $data = ModuleCatalog::fetchData($config, $query, $page, $perPage, $status !== '' ? $status : null, $from !== '' ? $from : null, $to !== '' ? $to : null);
             $columnsMeta = $data['columns'];
             $primaryKey = $columnsMeta['primary'];
             $isReadOnly = (bool) ($config['read_only'] ?? false);
@@ -94,9 +97,15 @@ abstract class Controller
                 'description' => $config['description'],
                 'route' => $config['route'],
                 'query' => $query,
+                'status' => $status,
+                'from' => $from,
+                'to' => $to,
                 'rows' => $data['rows'],
                 'columns' => $data['columns']['visible'],
                 'formFields' => $data['columns']['form'],
+                'statusField' => $data['columns']['status_field'],
+                'statusCounts' => $data['summary']['status_counts'] ?? [],
+                'moduleSummary' => $data['summary'],
                 'total' => $data['total'],
                 'page' => $data['page'],
                 'pages' => $data['pages'],
@@ -114,9 +123,15 @@ abstract class Controller
                 'description' => $config['description'],
                 'route' => $config['route'],
                 'query' => $query,
+                'status' => $status,
+                'from' => $from,
+                'to' => $to,
                 'rows' => [],
                 'columns' => [],
                 'formFields' => [],
+                'statusField' => null,
+                'statusCounts' => [],
+                'moduleSummary' => ['total' => 0, 'visibles' => 0, 'status_counts' => []],
                 'total' => 0,
                 'page' => 1,
                 'pages' => 1,

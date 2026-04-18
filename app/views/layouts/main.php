@@ -5,20 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= htmlspecialchars($title ?? 'Panel') ?></title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link href="<?= htmlspecialchars(url('public/assets/css/app.css')) ?>" rel="stylesheet">
 </head>
-<body class="bg-body-tertiary">
-<div class="container-fluid">
-  <div class="row">
-    <aside class="col-md-2 bg-dark text-white min-vh-100 p-3">
-      <?php require __DIR__ . '/partials/sidebar.php'; ?>
-    </aside>
-    <main class="col-md-10 p-4">
-      <?php require __DIR__ . '/partials/navbar.php'; ?>
-      <?= $content ?>
-      <?php require __DIR__ . '/partials/footer.php'; ?>
-    </main>
-  </div>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <?php require __DIR__ . '/partials/sidebar.php'; ?>
+  </aside>
+  <main class="main-content">
+    <?php require __DIR__ . '/partials/navbar.php'; ?>
+    <?= $content ?>
+    <?php require __DIR__ . '/partials/footer.php'; ?>
+  </main>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

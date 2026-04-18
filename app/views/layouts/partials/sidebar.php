@@ -1,20 +1,58 @@
-<div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom border-secondary-subtle">
-  <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center" style="width:32px;height:32px;">💼</div>
+<?php
+$currentPath = trim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH), '/');
+$currentPath = $currentPath === '' ? 'panel' : $currentPath;
+
+$menu = [
+    'Operación' => [
+        ['route' => 'panel', 'label' => 'Panel', 'icon' => 'bi-speedometer2'],
+        ['route' => 'socios', 'label' => 'Socios', 'icon' => 'bi-people'],
+        ['route' => 'periodos', 'label' => 'Periodos', 'icon' => 'bi-calendar3'],
+        ['route' => 'cuotas', 'label' => 'Cuotas', 'icon' => 'bi-receipt'],
+        ['route' => 'pagos', 'label' => 'Pagos', 'icon' => 'bi-credit-card-2-front'],
+        ['route' => 'aportes', 'label' => 'Aportes', 'icon' => 'bi-piggy-bank'],
+        ['route' => 'egresos', 'label' => 'Egresos', 'icon' => 'bi-cash-stack'],
+        ['route' => 'rendiciones', 'label' => 'Rendiciones', 'icon' => 'bi-journal-check'],
+        ['route' => 'tesoreria', 'label' => 'Tesorería', 'icon' => 'bi-bank'],
+    ],
+    'Gestión' => [
+        ['route' => 'reportes', 'label' => 'Reportes', 'icon' => 'bi-bar-chart'],
+        ['route' => 'auditoria', 'label' => 'Auditoría', 'icon' => 'bi-shield-lock'],
+        ['route' => 'usuarios', 'label' => 'Usuarios', 'icon' => 'bi-person-gear'],
+        ['route' => 'roles', 'label' => 'Roles', 'icon' => 'bi-person-badge'],
+        ['route' => 'configuracion', 'label' => 'Configuración', 'icon' => 'bi-sliders'],
+    ],
+    'Catálogos' => [
+        ['route' => 'tipos-socio', 'label' => 'Tipos de socio', 'icon' => 'bi-diagram-3'],
+        ['route' => 'medios-pago', 'label' => 'Medios de pago', 'icon' => 'bi-wallet2'],
+        ['route' => 'tipos-aporte', 'label' => 'Tipos de aporte', 'icon' => 'bi-coin'],
+        ['route' => 'tipos-egreso', 'label' => 'Tipos de egreso', 'icon' => 'bi-tags'],
+        ['route' => 'conceptos-cobro', 'label' => 'Conceptos de cobro', 'icon' => 'bi-card-list'],
+    ],
+];
+?>
+
+<div class="sidebar-brand">
+  <div class="sidebar-logo"><i class="bi bi-grid-1x2-fill"></i></div>
   <div>
-    <h6 class="mb-0">Gestión de Cuotas</h6>
-    <small class="text-white-50">Panel administrativo</small>
+    <h6 class="mb-0 text-white">Gestión de Cuotas</h6>
+    <small class="text-white-50">Administración integral</small>
   </div>
 </div>
 
-<ul class="nav flex-column small gap-1">
-  <li class="nav-item"><a class="nav-link text-white-50 hover-link" href="<?= htmlspecialchars(url('panel')) ?>">🏠 Panel</a></li>
-  <li class="nav-item"><a class="nav-link text-white-50 hover-link" href="<?= htmlspecialchars(url('socios')) ?>">👥 Socios</a></li>
-  <li class="nav-item"><a class="nav-link text-white-50 hover-link" href="<?= htmlspecialchars(url('cuotas')) ?>">🧾 Cuotas</a></li>
-  <li class="nav-item"><a class="nav-link text-white-50 hover-link" href="<?= htmlspecialchars(url('pagos')) ?>">💳 Pagos</a></li>
-  <li class="nav-item"><a class="nav-link text-white-50 hover-link" href="<?= htmlspecialchars(url('aportes')) ?>">💰 Aportes</a></li>
-  <li class="nav-item"><a class="nav-link text-white-50 hover-link" href="<?= htmlspecialchars(url('egresos')) ?>">📤 Egresos</a></li>
-  <li class="nav-item"><a class="nav-link text-white-50 hover-link" href="<?= htmlspecialchars(url('tesoreria')) ?>">🏦 Tesorería</a></li>
-  <li class="nav-item"><a class="nav-link text-white-50 hover-link" href="<?= htmlspecialchars(url('reportes')) ?>">📊 Reportes</a></li>
-  <li class="nav-item"><a class="nav-link text-white-50 hover-link" href="<?= htmlspecialchars(url('usuarios')) ?>">🧑‍💻 Usuarios</a></li>
-  <li class="nav-item"><a class="nav-link text-white-50 hover-link" href="<?= htmlspecialchars(url('auditoria')) ?>">🛡️ Auditoría</a></li>
-</ul>
+<?php foreach ($menu as $group => $items): ?>
+  <p class="sidebar-label"><?= htmlspecialchars($group) ?></p>
+  <ul class="nav flex-column sidebar-nav mb-2">
+    <?php foreach ($items as $item): ?>
+      <?php
+      $isActive = $currentPath === trim((string) $item['route'], '/');
+      $classes = 'nav-link' . ($isActive ? ' is-active' : '');
+      ?>
+      <li class="nav-item">
+        <a class="<?= htmlspecialchars($classes) ?>" href="<?= htmlspecialchars(url((string) $item['route'])) ?>">
+          <i class="bi <?= htmlspecialchars((string) $item['icon']) ?>"></i>
+          <span><?= htmlspecialchars((string) $item['label']) ?></span>
+        </a>
+      </li>
+    <?php endforeach; ?>
+  </ul>
+<?php endforeach; ?>
