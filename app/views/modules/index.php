@@ -57,7 +57,7 @@ $reportQueryParams = array_merge([
   </div>
 </section>
 
-<?php if (!empty($moduleSummary) && ($route ?? '') !== 'rendiciones'): ?>
+<?php if (!empty($moduleSummary)): ?>
   <div class="module-grid-summary mb-3">
     <article class="quick-summary">
       <div class="label">Registros totales</div>
