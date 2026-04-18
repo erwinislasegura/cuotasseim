@@ -13,7 +13,7 @@ class ModuleCatalog
         $modules = [
             'socios' => ['title' => 'Socios', 'description' => 'Administración del padrón de socios con estado, deuda y seguimiento.', 'table' => 'socios', 'route' => 'socios'],
             'tipos_socio' => ['title' => 'Tipos de socio', 'description' => 'Catálogo de categorías y segmentación de socios.', 'table' => 'tipos_socio', 'route' => 'tipos-socio'],
-            'periodos' => ['title' => 'Periodos', 'description' => 'Gestión de periodos de cobranza y su ciclo operativo.', 'table' => 'periodos', 'route' => 'periodos'],
+            'periodos' => ['title' => 'Planes', 'description' => 'Creación de planes de cobro por frecuencia.', 'table' => 'periodos', 'route' => 'periodos'],
             'conceptos_cobro' => ['title' => 'Conceptos de cobro', 'description' => 'Definición de conceptos recurrentes y extraordinarios.', 'table' => 'conceptos_cobro', 'route' => 'conceptos-cobro'],
             'cuotas' => ['title' => 'Cuotas', 'description' => 'Control de cuotas con foco en morosidad y cobranzas.', 'table' => 'cuotas', 'route' => 'cuotas'],
             'medios_pago' => ['title' => 'Medios de pago', 'description' => 'Catálogo de medios habilitados para recaudación.', 'table' => 'medios_pago', 'route' => 'medios-pago'],
@@ -194,6 +194,12 @@ class ModuleCatalog
             if ($id === null && empty($data['numero_socio'])) {
                 $data['numero_socio'] = self::nextSocioNumber();
             }
+        }
+
+        if ($table === 'periodos') {
+            $data['anio'] = (string) ($data['anio'] ?? date('Y'));
+            $data['mes'] = (string) ($data['mes'] ?? date('n'));
+            $data['cerrado'] = (string) ($data['cerrado'] ?? '0');
         }
 
         $db = Database::connection();
