@@ -171,6 +171,14 @@ body {
 .btn-outline-secondary { border-color: #c8d3df; color: #3f556d; }
 .btn-light { background: #f9fbfe; border-color: #dce6f1; }
 
+.egreso-flow-hint {
+  border: 1px dashed #c8d8ea;
+  background: #f7fbff;
+  color: #38526c;
+  border-radius: 0.55rem;
+  padding: 0.55rem 0.7rem;
+}
+
 .table {
   --bs-table-striped-bg: #f7f9fc;
   --bs-table-hover-bg: #eef3f9;
