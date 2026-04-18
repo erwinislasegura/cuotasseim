@@ -174,19 +174,30 @@ body {
 .table {
   --bs-table-striped-bg: #f7f9fc;
   --bs-table-hover-bg: #eef3f9;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .table thead th {
-  font-size: 0.74rem;
+  font-size: 0.7rem;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: #4e6178;
   border-bottom-width: 1px;
   background: #f8fbff;
+  font-weight: 500;
 }
 
-.table td, .table th { padding: 0.56rem 0.62rem; }
+.table td,
+.table th {
+  padding: 0.5rem 0.6rem;
+  vertical-align: middle;
+}
+
+.table td {
+  font-weight: 400;
+  color: #33485f;
+}
 .module-table-responsive {
   overflow-x: auto;
   overflow-y: visible;
