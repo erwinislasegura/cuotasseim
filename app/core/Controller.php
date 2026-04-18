@@ -13,7 +13,11 @@ abstract class Controller
 
     protected function redirect(string $path): void
     {
-        header('Location: ' . $path);
+        $target = preg_match('#^https?://#i', $path)
+            ? $path
+            : url(ltrim($path, '/'));
+
+        header('Location: ' . $target);
         exit;
     }
 }

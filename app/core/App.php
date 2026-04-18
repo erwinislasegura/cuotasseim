@@ -20,6 +20,14 @@ class App
             $uri = substr($uri, strlen($basePath)) ?: '/';
         }
 
+        $frontController = '/' . ltrim(basename((string) ($_SERVER['SCRIPT_NAME'] ?? 'index.php')), '/');
+
+        if ($uri === $frontController) {
+            $uri = '/';
+        } elseif (str_starts_with($uri, $frontController . '/')) {
+            $uri = substr($uri, strlen($frontController)) ?: '/';
+        }
+
         $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
         (new Router())->dispatch($method, $uri);

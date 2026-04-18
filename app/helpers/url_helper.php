@@ -25,5 +25,15 @@ function url(string $path = ''): string
         $base = $scheme . '://' . $host . $scriptDir;
     }
 
-    return $base . '/' . ltrim($path, '/');
+    $normalizedPath = ltrim($path, '/');
+
+    if ($normalizedPath === '') {
+        return $base . '/';
+    }
+
+    if (str_starts_with($normalizedPath, 'public/')) {
+        return $base . '/' . $normalizedPath;
+    }
+
+    return $base . '/index.php/' . $normalizedPath;
 }
