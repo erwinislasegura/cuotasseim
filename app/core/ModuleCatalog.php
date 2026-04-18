@@ -110,13 +110,22 @@ class ModuleCatalog
         fclose($output);
     }
 
-    public static function fetchData(array $config, string $query, int $page, int $perPage, ?string $status = null, ?string $from = null, ?string $to = null): array
+    public static function fetchData(
+        array $config,
+        string $query,
+        int $page,
+        int $perPage,
+        ?string $status = null,
+        ?string $from = null,
+        ?string $to = null,
+        array $extraConditions = []
+    ): array
     {
         $db = Database::connection();
         $columnsMeta = self::resolveColumns($db, $config['table']);
         $searchColumns = $columnsMeta['searchable'];
 
-        [$whereSql, $params] = self::buildWhereSql($columnsMeta, $query, $status, $from, $to);
+        [$whereSql, $params] = self::buildWhereSql($columnsMeta, $query, $status, $from, $to, $extraConditions);
 
         $countStmt = $db->prepare('SELECT COUNT(*) FROM `' . $config['table'] . '`' . $whereSql);
         foreach ($params as $k => $v) {
@@ -135,7 +144,7 @@ class ModuleCatalog
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
 
-        $statusCounts = self::fetchStatusCounts($db, $config['table'], $columnsMeta, $query, $from, $to);
+        $statusCounts = self::fetchStatusCounts($db, $config['table'], $columnsMeta, $query, $from, $to, $extraConditions);
 
         $summary = [
             'total' => $total,
@@ -550,14 +559,14 @@ class ModuleCatalog
         $stmt->execute();
     }
 
-    private static function fetchStatusCounts(PDO $db, string $table, array $columnsMeta, string $query, ?string $from, ?string $to): array
+    private static function fetchStatusCounts(PDO $db, string $table, array $columnsMeta, string $query, ?string $from, ?string $to, array $extraConditions = []): array
     {
         $statusField = $columnsMeta['status_field'];
         if ($statusField === null) {
             return [];
         }
 
-        [$whereSql, $params] = self::buildWhereSql($columnsMeta, $query, null, $from, $to);
+        [$whereSql, $params] = self::buildWhereSql($columnsMeta, $query, null, $from, $to, $extraConditions);
         $sql = 'SELECT `' . $statusField . '` AS estado, COUNT(*) AS total FROM `' . $table . '`' . $whereSql . ' GROUP BY `' . $statusField . '` ORDER BY total DESC';
         $stmt = $db->prepare($sql);
         foreach ($params as $k => $v) {
@@ -662,7 +671,7 @@ class ModuleCatalog
         return self::$foreignLabelCache[$cacheKey][$id];
     }
 
-    private static function buildWhereSql(array $columnsMeta, string $query, ?string $status, ?string $from, ?string $to): array
+    private static function buildWhereSql(array $columnsMeta, string $query, ?string $status, ?string $from, ?string $to, array $extraConditions = []): array
     {
         $searchColumns = $columnsMeta['searchable'];
         $conditions = [];
@@ -701,6 +710,33 @@ class ModuleCatalog
             if ($to !== null && $to !== '') {
                 $conditions[] = "DATE(`{$dateField}`) <= :to";
                 $params[':to'] = $to;
+            }
+        }
+
+        foreach ($extraConditions as $index => $extraCondition) {
+            if (!is_array($extraCondition)) {
+                continue;
+            }
+
+            $sql = trim((string) ($extraCondition['sql'] ?? ''));
+            if ($sql === '') {
+                continue;
+            }
+
+            $conditions[] = '(' . $sql . ')';
+            $conditionParams = $extraCondition['params'] ?? [];
+            if (!is_array($conditionParams)) {
+                continue;
+            }
+
+            foreach ($conditionParams as $rawName => $value) {
+                $name = (string) $rawName;
+                if ($name === '') {
+                    continue;
+                }
+
+                $paramName = str_starts_with($name, ':') ? $name : ':' . $name;
+                $params[$paramName] = $value;
             }
         }
 
