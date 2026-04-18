@@ -224,7 +224,7 @@ body {
 
 .modal-detail-body {
   background: #f8fbff;
-  padding: 0.85rem;
+  padding: 0.7rem;
 }
 
 .record-detail-summary {
@@ -259,26 +259,26 @@ body {
 
 .record-detail-item {
   border: 1px solid #dbe5f0;
-  border-radius: 0.62rem;
+  border-radius: 0.52rem;
   background: #ffffff;
-  padding: 0.58rem 0.65rem;
-  min-height: 74px;
+  padding: 0.45rem 0.58rem;
+  min-height: 0;
 }
 
 .record-detail-label {
   color: #6a7d94;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  font-size: 0.68rem;
-  margin-bottom: 0.18rem;
+  font-size: 0.64rem;
+  margin-bottom: 0.12rem;
   font-weight: 700;
 }
 
 .record-detail-value {
-  font-size: 0.81rem;
+  font-size: 0.78rem;
   color: #2a405a;
-  font-weight: 600;
-  line-height: 1.35;
+  font-weight: 500;
+  line-height: 1.28;
   word-break: break-word;
 }
 

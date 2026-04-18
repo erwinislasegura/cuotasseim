@@ -306,7 +306,7 @@ $statusOptions = [
 </div>
 
 <div class="modal fade" id="recordDetailModal" tabindex="-1" aria-labelledby="recordDetailModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
     <div class="modal-content modal-detail-content border-0 shadow-sm">
       <div class="modal-header modal-detail-header">
         <div>
@@ -393,16 +393,33 @@ $statusOptions = [
 
     const renderRecordDetails = function (payload) {
       const details = Array.isArray(payload) ? payload : [];
-      renderRecordSummary(details);
-      if (details.length === 0) {
+      const compactDetails = details.filter(function (item) {
+        if (!item) {
+          return false;
+        }
+        const rawValue = item.value === null || item.value === undefined ? '' : String(item.value).trim();
+        if (rawValue === '' || rawValue === '-') {
+          return false;
+        }
+
+        const rawLabel = String(item.label || '').toLowerCase();
+        const technicalFields = ['created at', 'updated at', 'deleted at'];
+        if (technicalFields.some(function (field) { return rawLabel.indexOf(field) !== -1; })) {
+          return false;
+        }
+
+        return true;
+      });
+      renderRecordSummary(compactDetails);
+      if (compactDetails.length === 0) {
         detailBody.innerHTML = '<div class="col-12"><div class="record-detail-item text-muted">No hay datos para mostrar.</div></div>';
         return;
       }
 
-      detailBody.innerHTML = details.map(function (item) {
+      detailBody.innerHTML = compactDetails.map(function (item) {
         const label = escapeHtml(item && item.label ? item.label : '');
         const value = escapeHtml(item && item.value ? item.value : '-');
-        return '<div class="col-12 col-md-6 col-xl-4"><article class="record-detail-item"><div class="record-detail-label">' + label + '</div><div class="record-detail-value">' + value + '</div></article></div>';
+        return '<div class="col-12 col-md-6"><article class="record-detail-item"><div class="record-detail-label">' + label + '</div><div class="record-detail-value">' + value + '</div></article></div>';
       }).join('');
     };
 
