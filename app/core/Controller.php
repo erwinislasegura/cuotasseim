@@ -865,16 +865,20 @@ abstract class Controller
         $dateWhereAportes = '';
         $dateWhereEgresos = '';
         if ($from !== '') {
-            $dateWherePagos .= ' AND DATE(p.fecha_pago) >= :from_date';
-            $dateWhereAportes .= ' AND DATE(a.fecha_aporte) >= :from_date';
-            $dateWhereEgresos .= ' AND DATE(e.fecha) >= :from_date';
-            $params[':from_date'] = $from;
+            $dateWherePagos .= ' AND DATE(p.fecha_pago) >= :from_date_pagos';
+            $dateWhereAportes .= ' AND DATE(a.fecha_aporte) >= :from_date_aportes';
+            $dateWhereEgresos .= ' AND DATE(e.fecha) >= :from_date_egresos';
+            $params[':from_date_pagos'] = $from;
+            $params[':from_date_aportes'] = $from;
+            $params[':from_date_egresos'] = $from;
         }
         if ($to !== '') {
-            $dateWherePagos .= ' AND DATE(p.fecha_pago) <= :to_date';
-            $dateWhereAportes .= ' AND DATE(a.fecha_aporte) <= :to_date';
-            $dateWhereEgresos .= ' AND DATE(e.fecha) <= :to_date';
-            $params[':to_date'] = $to;
+            $dateWherePagos .= ' AND DATE(p.fecha_pago) <= :to_date_pagos';
+            $dateWhereAportes .= ' AND DATE(a.fecha_aporte) <= :to_date_aportes';
+            $dateWhereEgresos .= ' AND DATE(e.fecha) <= :to_date_egresos';
+            $params[':to_date_pagos'] = $to;
+            $params[':to_date_aportes'] = $to;
+            $params[':to_date_egresos'] = $to;
         }
 
         $sql = "
