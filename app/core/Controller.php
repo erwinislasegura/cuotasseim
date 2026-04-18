@@ -205,7 +205,7 @@ abstract class Controller
                     'byType' => $byType,
                     'byOrigin' => $byOrigin,
                     'byMonth' => $byMonth,
-                ]);
+                ], 'print');
                 return;
             }
 
@@ -401,7 +401,7 @@ abstract class Controller
                     'byType' => $byType,
                     'byOrigin' => $byOrigin,
                     'byMonth' => $byMonth,
-                ]);
+                ], 'print');
                 return;
             }
 
