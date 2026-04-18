@@ -15,6 +15,8 @@ $statusOptions = [
   'cerrada' => 'Cerrada',
   'abierta' => 'Abierta',
   'exenta' => 'Exenta',
+  'ingreso' => 'Ingreso',
+  'egreso' => 'Egreso',
 ];
 
 $isPaymentHistory = ($route ?? '') === 'pagos';
@@ -26,6 +28,13 @@ $exportQueryParams = array_merge([
   'from' => (string) ($from ?? ''),
   'to' => (string) ($to ?? ''),
   'export' => 'excel',
+], $extraQueryParams);
+$reportQueryParams = array_merge([
+  'q' => (string) ($query ?? ''),
+  'status' => (string) ($status ?? ''),
+  'from' => (string) ($from ?? ''),
+  'to' => (string) ($to ?? ''),
+  'report' => 'print',
 ], $extraQueryParams);
 ?>
 
@@ -41,7 +50,7 @@ $exportQueryParams = array_merge([
     </nav>
   </div>
   <div class="d-flex gap-2">
-    <?php if (!$isPaymentHistory): ?>
+    <?php if (!$isPaymentHistory && !($isReadOnly ?? false)): ?>
       <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(url($route ?? '')) ?>"><i class="bi bi-plus-circle me-1"></i>Nuevo</a>
     <?php endif; ?>
     <a class="btn btn-primary btn-sm" href="<?= htmlspecialchars(url(($route ?? '') . '?' . http_build_query($exportQueryParams))) ?>"><i class="bi bi-download me-1"></i>Excel</a>
@@ -87,7 +96,7 @@ $exportQueryParams = array_merge([
   <div class="alert alert-danger small mb-3"><?= htmlspecialchars($error) ?></div>
 <?php endif; ?>
 
-<?php if (!$isPaymentHistory): ?>
+<?php if (!$isPaymentHistory && !($isReadOnly ?? false)): ?>
   <div class="card mb-3">
     <div class="card-header py-2"><strong class="card-title mb-0"><?= !empty($currentRecord) ? 'Editar registro' : 'Crear registro' ?></strong></div>
     <div class="card-body py-3">
@@ -521,6 +530,16 @@ $exportQueryParams = array_merge([
 <div class="card">
   <div class="card-header py-2 d-flex justify-content-between align-items-center gap-2 flex-wrap">
     <strong class="card-title mb-0"><?= $isPaymentHistory ? 'Historial de pagos' : 'Listado de registros' ?></strong>
+    <?php if (($route ?? '') === 'rendiciones'): ?>
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary btn-sm" href="<?= htmlspecialchars(url(($route ?? '') . '?' . http_build_query($exportQueryParams))) ?>">
+          <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
+        </a>
+        <a class="btn btn-outline-dark btn-sm" target="_blank" href="<?= htmlspecialchars(url(($route ?? '') . '?' . http_build_query($reportQueryParams))) ?>">
+          <i class="bi bi-printer me-1"></i>Imprimir informe
+        </a>
+      </div>
+    <?php endif; ?>
     <form method="get" action="<?= htmlspecialchars(url($route ?? '')) ?>" class="row gx-2 gy-2 align-items-end">
       <div class="col-sm-auto">
         <label class="form-label">Buscar</label>

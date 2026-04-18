@@ -27,7 +27,7 @@ class ModuleCatalog
             'aportes' => ['title' => 'Aportes', 'description' => 'Seguimiento de aportes extraordinarios por origen y estado.', 'table' => 'aportes', 'route' => 'aportes'],
             'tipos_egreso' => ['title' => 'Tipos de egreso', 'description' => 'Clasificación de egresos para tesorería y rendiciones.', 'table' => 'tipos_egreso', 'route' => 'tipos-egreso'],
             'egresos' => ['title' => 'Egresos', 'description' => 'Control operativo de egresos, comprobantes y estado.', 'table' => 'egresos', 'route' => 'egresos'],
-            'rendiciones' => ['title' => 'Rendiciones', 'description' => 'Consolidación de egresos para rendición y cierre.', 'table' => 'rendiciones', 'route' => 'rendiciones'],
+            'rendiciones' => ['title' => 'Rendiciones', 'description' => 'Consulta consolidada de ingresos y egresos por periodo y socio.', 'table' => 'movimientos_tesoreria', 'route' => 'rendiciones', 'read_only' => true],
             'tesoreria' => ['title' => 'Movimientos de tesorería', 'description' => 'Seguimiento de movimientos, diferencias y conciliación.', 'table' => 'movimientos_tesoreria', 'route' => 'tesoreria'],
             'roles' => ['title' => 'Roles', 'description' => 'Administración de perfiles de acceso.', 'table' => 'roles', 'route' => 'roles'],
             'usuarios' => ['title' => 'Usuarios', 'description' => 'Gestión de usuarios y permisos operativos.', 'table' => 'usuarios', 'route' => 'usuarios'],

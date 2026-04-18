@@ -45,7 +45,7 @@ abstract class Controller
         $extraConditions = [];
         $extraQueryParams = [];
 
-        if (($config['table'] ?? '') === 'rendiciones') {
+        if (($config['route'] ?? '') === 'rendiciones') {
             $periodPreset = trim((string) ($_GET['periodo'] ?? ''));
             $socioId = (int) ($_GET['socio_id'] ?? 0);
             $montoMin = trim((string) ($_GET['monto_min'] ?? ''));
@@ -74,16 +74,29 @@ abstract class Controller
 
             if ($socioId > 0) {
                 $extraConditions[] = [
-                    'sql' => 'EXISTS (
-                        SELECT 1
-                        FROM rendicion_detalle rd
-                        INNER JOIN egresos e ON e.id = rd.egreso_id
-                        INNER JOIN socios s ON s.id = :filtro_socio_id
-                        WHERE rd.rendicion_id = rendiciones.id
-                          AND (
-                            e.proveedor_destinatario LIKE CONCAT(\'%\', COALESCE(s.nombre_completo, \'\'), \'%\')
-                            OR (COALESCE(s.rut, \'\') <> \'\' AND e.proveedor_destinatario LIKE CONCAT(\'%\', s.rut, \'%\'))
-                          )
+                    'sql' => '(
+                        (origen_modulo = \'pagos\' AND EXISTS (
+                            SELECT 1 FROM pagos p
+                            WHERE p.id = movimientos_tesoreria.referencia_id
+                              AND p.socio_id = :filtro_socio_id
+                        ))
+                        OR
+                        (origen_modulo = \'aportes\' AND EXISTS (
+                            SELECT 1 FROM aportes a
+                            WHERE a.id = movimientos_tesoreria.referencia_id
+                              AND a.socio_id = :filtro_socio_id
+                        ))
+                        OR
+                        (origen_modulo = \'egresos\' AND EXISTS (
+                            SELECT 1
+                            FROM egresos e
+                            INNER JOIN socios s ON s.id = :filtro_socio_id
+                            WHERE e.id = movimientos_tesoreria.referencia_id
+                              AND (
+                                e.proveedor_destinatario LIKE CONCAT(\'%\', COALESCE(s.nombre_completo, \'\'), \'%\')
+                                OR (COALESCE(s.rut, \'\') <> \'\' AND e.proveedor_destinatario LIKE CONCAT(\'%\', s.rut, \'%\'))
+                              )
+                        ))
                     )',
                     'params' => [
                         ':filtro_socio_id' => $socioId,
@@ -93,14 +106,14 @@ abstract class Controller
 
             if ($montoMin !== '' && is_numeric($montoMin)) {
                 $extraConditions[] = [
-                    'sql' => 'monto_total >= :filtro_monto_min',
+                    'sql' => '(COALESCE(ingreso, 0) + COALESCE(egreso, 0)) >= :filtro_monto_min',
                     'params' => [':filtro_monto_min' => (float) $montoMin],
                 ];
             }
 
             if ($montoMax !== '' && is_numeric($montoMax)) {
                 $extraConditions[] = [
-                    'sql' => 'monto_total <= :filtro_monto_max',
+                    'sql' => '(COALESCE(ingreso, 0) + COALESCE(egreso, 0)) <= :filtro_monto_max',
                     'params' => [':filtro_monto_max' => (float) $montoMax],
                 ];
             }
@@ -159,6 +172,78 @@ abstract class Controller
 
             if (($_GET['export'] ?? '') === 'excel') {
                 ModuleCatalog::exportCsv($config['route'] . '_' . date('Ymd_His') . '.csv', $data['columns']['all'], $data['rows']);
+                return;
+            }
+
+            if (($config['route'] ?? '') === 'rendiciones' && (string) ($_GET['report'] ?? '') === 'print') {
+                $fullPerPage = max(1, min(5000, (int) ($data['total'] ?? 0)));
+                $fullData = ModuleCatalog::fetchData(
+                    $config,
+                    $query,
+                    1,
+                    $fullPerPage,
+                    $status !== '' ? $status : null,
+                    $from !== '' ? $from : null,
+                    $to !== '' ? $to : null,
+                    $extraConditions
+                );
+
+                $reportRows = $fullData['rows'];
+                $reportSummary = [
+                    'total_registros' => count($reportRows),
+                    'total_ingresos' => 0.0,
+                    'total_egresos' => 0.0,
+                ];
+                $byType = ['ingreso' => 0.0, 'egreso' => 0.0];
+                $byOrigin = [];
+                $byMonth = [];
+
+                foreach ($reportRows as $row) {
+                    $ingreso = (float) ($row['ingreso'] ?? 0);
+                    $egreso = (float) ($row['egreso'] ?? 0);
+                    $reportSummary['total_ingresos'] += $ingreso;
+                    $reportSummary['total_egresos'] += $egreso;
+
+                    $tipo = strtolower(trim((string) ($row['tipo_movimiento'] ?? '')));
+                    if (!isset($byType[$tipo])) {
+                        $byType[$tipo] = 0.0;
+                    }
+                    $byType[$tipo] += $ingreso > 0 ? $ingreso : $egreso;
+
+                    $origin = trim((string) ($row['origen_modulo'] ?? 'sin_origen'));
+                    if ($origin === '') {
+                        $origin = 'sin_origen';
+                    }
+                    if (!isset($byOrigin[$origin])) {
+                        $byOrigin[$origin] = ['ingreso' => 0.0, 'egreso' => 0.0];
+                    }
+                    $byOrigin[$origin]['ingreso'] += $ingreso;
+                    $byOrigin[$origin]['egreso'] += $egreso;
+
+                    $monthKey = date('Y-m', strtotime((string) ($row['fecha'] ?? 'now')));
+                    if (!isset($byMonth[$monthKey])) {
+                        $byMonth[$monthKey] = ['ingreso' => 0.0, 'egreso' => 0.0];
+                    }
+                    $byMonth[$monthKey]['ingreso'] += $ingreso;
+                    $byMonth[$monthKey]['egreso'] += $egreso;
+                }
+
+                ksort($byMonth);
+                ksort($byOrigin);
+
+                $this->view('rendiciones/report', [
+                    'title' => 'Informe de rendiciones',
+                    'rows' => $reportRows,
+                    'query' => $query,
+                    'status' => $status,
+                    'from' => $from,
+                    'to' => $to,
+                    'extraFilters' => $extraFilters,
+                    'summary' => $reportSummary,
+                    'byType' => $byType,
+                    'byOrigin' => $byOrigin,
+                    'byMonth' => $byMonth,
+                ]);
                 return;
             }
 
@@ -490,9 +575,29 @@ abstract class Controller
                 ], $data['columns']['all']));
             }
 
-            if ($config['table'] === 'rendiciones') {
+            if (($config['route'] ?? '') === 'rendiciones') {
                 $sociosStmt = Database::connection()->query('SELECT id, nombre_completo, rut, numero_socio FROM socios WHERE deleted_at IS NULL ORDER BY nombre_completo ASC');
                 $socios = $sociosStmt->fetchAll();
+
+                $columnLabels = [
+                    'fecha' => 'Fecha',
+                    'tipo_movimiento' => 'Tipo',
+                    'origen_modulo' => 'Origen',
+                    'descripcion' => 'Descripción',
+                    'ingreso' => 'Ingreso',
+                    'egreso' => 'Egreso',
+                    'saldo_referencial' => 'Saldo referencial',
+                ];
+                $visibleColumns = array_values(array_intersect([
+                    'fecha',
+                    'tipo_movimiento',
+                    'origen_modulo',
+                    'descripcion',
+                    'ingreso',
+                    'egreso',
+                    'saldo_referencial',
+                ], $data['columns']['all']));
+                $formFields = [];
                 $formMeta['rendiciones_filter_options'] = [
                     'periodos' => [
                         ['value' => '', 'label' => 'Manual (Desde/Hasta)'],
