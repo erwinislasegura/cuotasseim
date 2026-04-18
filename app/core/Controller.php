@@ -131,6 +131,157 @@ abstract class Controller
                 }
                 $extraQueryParams[$key] = (string) $value;
             }
+
+            $rendicionesResult = $this->buildRendicionesDataset(
+                $query,
+                $status,
+                $from,
+                $to,
+                $extraFilters
+            );
+
+            if (($_GET['export'] ?? '') === 'excel') {
+                ModuleCatalog::exportCsv(
+                    'rendiciones_' . date('Ymd_His') . '.csv',
+                    ['fecha', 'tipo_movimiento', 'origen_modulo', 'descripcion', 'ingreso', 'egreso'],
+                    $rendicionesResult['filtered_rows']
+                );
+                return;
+            }
+
+            if ((string) ($_GET['report'] ?? '') === 'print') {
+                $reportRows = $rendicionesResult['filtered_rows'];
+                $reportSummary = [
+                    'total_registros' => count($reportRows),
+                    'total_ingresos' => 0.0,
+                    'total_egresos' => 0.0,
+                ];
+                $byType = ['ingreso' => 0.0, 'egreso' => 0.0];
+                $byOrigin = [];
+                $byMonth = [];
+
+                foreach ($reportRows as $row) {
+                    $ingreso = (float) ($row['ingreso'] ?? 0);
+                    $egreso = (float) ($row['egreso'] ?? 0);
+                    $reportSummary['total_ingresos'] += $ingreso;
+                    $reportSummary['total_egresos'] += $egreso;
+
+                    $tipo = strtolower(trim((string) ($row['tipo_movimiento'] ?? '')));
+                    if (!isset($byType[$tipo])) {
+                        $byType[$tipo] = 0.0;
+                    }
+                    $byType[$tipo] += $ingreso > 0 ? $ingreso : $egreso;
+
+                    $origin = trim((string) ($row['origen_modulo'] ?? 'sin_origen'));
+                    if ($origin === '') {
+                        $origin = 'sin_origen';
+                    }
+                    if (!isset($byOrigin[$origin])) {
+                        $byOrigin[$origin] = ['ingreso' => 0.0, 'egreso' => 0.0];
+                    }
+                    $byOrigin[$origin]['ingreso'] += $ingreso;
+                    $byOrigin[$origin]['egreso'] += $egreso;
+
+                    $monthKey = date('Y-m', strtotime((string) ($row['fecha'] ?? 'now')));
+                    if (!isset($byMonth[$monthKey])) {
+                        $byMonth[$monthKey] = ['ingreso' => 0.0, 'egreso' => 0.0];
+                    }
+                    $byMonth[$monthKey]['ingreso'] += $ingreso;
+                    $byMonth[$monthKey]['egreso'] += $egreso;
+                }
+
+                ksort($byMonth);
+                ksort($byOrigin);
+
+                $this->view('rendiciones/report', [
+                    'title' => 'Informe de rendiciones',
+                    'rows' => $reportRows,
+                    'query' => $query,
+                    'status' => $status,
+                    'from' => $from,
+                    'to' => $to,
+                    'extraFilters' => $extraFilters,
+                    'summary' => $reportSummary,
+                    'byType' => $byType,
+                    'byOrigin' => $byOrigin,
+                    'byMonth' => $byMonth,
+                ]);
+                return;
+            }
+
+            $sociosStmt = Database::connection()->query('SELECT id, nombre_completo, rut, numero_socio FROM socios WHERE deleted_at IS NULL ORDER BY nombre_completo ASC');
+            $socios = $sociosStmt->fetchAll();
+            $formMeta = [
+                'rendiciones_filter_options' => [
+                    'periodos' => [
+                        ['value' => '', 'label' => 'Manual (Desde/Hasta)'],
+                        ['value' => 'mes_actual', 'label' => 'Mes actual'],
+                        ['value' => 'mes_anterior', 'label' => 'Mes anterior'],
+                        ['value' => 'trimestre_actual', 'label' => 'Trimestre actual'],
+                        ['value' => 'anio_actual', 'label' => 'Año actual'],
+                    ],
+                    'socios' => array_map(static function (array $item): array {
+                        $nombre = trim((string) ($item['nombre_completo'] ?? ''));
+                        $rut = trim((string) ($item['rut'] ?? ''));
+                        $numeroSocio = trim((string) ($item['numero_socio'] ?? ''));
+                        $label = $nombre !== '' ? $nombre : ('Socio #' . (string) ($item['id'] ?? ''));
+                        if ($rut !== '') {
+                            $label .= ' · ' . $rut;
+                        }
+                        if ($numeroSocio !== '') {
+                            $label .= ' · N° ' . $numeroSocio;
+                        }
+                        return [
+                            'value' => (string) ($item['id'] ?? ''),
+                            'label' => $label,
+                        ];
+                    }, $socios),
+                ],
+            ];
+
+            $this->view('modules/index', [
+                'title' => $config['title'],
+                'description' => $config['description'],
+                'route' => $config['route'],
+                'query' => $query,
+                'status' => $status,
+                'from' => $from,
+                'to' => $to,
+                'rows' => $rendicionesResult['rows'],
+                'displayRows' => $rendicionesResult['rows'],
+                'columns' => ['fecha', 'tipo_movimiento', 'origen_modulo', 'descripcion', 'ingreso', 'egreso'],
+                'formFields' => [],
+                'statusField' => 'tipo_movimiento',
+                'statusCounts' => $rendicionesResult['status_counts'],
+                'moduleSummary' => [
+                    'total' => $rendicionesResult['total'],
+                    'visibles' => count($rendicionesResult['rows']),
+                    'status_counts' => $rendicionesResult['status_counts'],
+                ],
+                'total' => $rendicionesResult['total'],
+                'page' => $page,
+                'pages' => $rendicionesResult['pages'],
+                'token' => Csrf::token(),
+                'primaryKey' => 'row_id',
+                'currentRecord' => null,
+                'viewRecord' => null,
+                'viewRecordDisplay' => null,
+                'isReadOnly' => true,
+                'flashSuccess' => null,
+                'flashError' => null,
+                'formMeta' => $formMeta,
+                'columnLabels' => [
+                    'fecha' => 'Fecha',
+                    'tipo_movimiento' => 'Tipo',
+                    'origen_modulo' => 'Origen',
+                    'descripcion' => 'Descripción',
+                    'ingreso' => 'Ingreso',
+                    'egreso' => 'Egreso',
+                ],
+                'extraFilters' => $extraFilters,
+                'extraQueryParams' => $extraQueryParams,
+            ]);
+            return;
         }
 
         try {
@@ -694,5 +845,137 @@ abstract class Controller
                 'extraQueryParams' => [],
             ]);
         }
+    }
+
+    private function buildRendicionesDataset(string $query, string $status, string $from, string $to, array $extraFilters): array
+    {
+        $db = Database::connection();
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        $perPage = 10;
+
+        $params = [];
+        $dateWherePagos = '';
+        $dateWhereAportes = '';
+        $dateWhereEgresos = '';
+        if ($from !== '') {
+            $dateWherePagos .= ' AND DATE(p.fecha_pago) >= :from_date';
+            $dateWhereAportes .= ' AND DATE(a.fecha_aporte) >= :from_date';
+            $dateWhereEgresos .= ' AND DATE(e.fecha) >= :from_date';
+            $params[':from_date'] = $from;
+        }
+        if ($to !== '') {
+            $dateWherePagos .= ' AND DATE(p.fecha_pago) <= :to_date';
+            $dateWhereAportes .= ' AND DATE(a.fecha_aporte) <= :to_date';
+            $dateWhereEgresos .= ' AND DATE(e.fecha) <= :to_date';
+            $params[':to_date'] = $to;
+        }
+
+        $sql = "
+            SELECT CONCAT('P-', p.id) AS row_id, p.fecha_pago AS fecha, 'ingreso' AS tipo_movimiento, 'pago_cuota' AS origen_modulo,
+                   CONCAT('Pago cuota ', COALESCE(p.numero_comprobante, CONCAT('#', p.id)), ' · ', COALESCE(s.nombre_completo, 'Socio')) AS descripcion,
+                   p.monto_total AS ingreso, 0 AS egreso, s.id AS socio_id, COALESCE(s.rut, '') AS socio_rut, COALESCE(s.nombre_completo, '') AS socio_nombre
+            FROM pagos p
+            INNER JOIN socios s ON s.id = p.socio_id
+            WHERE (p.deleted_at IS NULL) AND p.estado_pago <> 'anulado' {$dateWherePagos}
+
+            UNION ALL
+
+            SELECT CONCAT('A-', a.id) AS row_id, a.fecha_aporte AS fecha, 'ingreso' AS tipo_movimiento, 'aporte' AS origen_modulo,
+                   CONCAT('Aporte ', COALESCE(a.comentario, a.descripcion, ''), ' · ', COALESCE(s.nombre_completo, a.nombre_aportante, 'Aportante')) AS descripcion,
+                   a.monto AS ingreso, 0 AS egreso, COALESCE(s.id, 0) AS socio_id, COALESCE(s.rut, '') AS socio_rut, COALESCE(s.nombre_completo, a.nombre_aportante, '') AS socio_nombre
+            FROM aportes a
+            LEFT JOIN socios s ON s.id = a.socio_id
+            WHERE a.estado <> 'anulado' {$dateWhereAportes}
+
+            UNION ALL
+
+            SELECT CONCAT('E-', e.id) AS row_id, e.fecha AS fecha, 'egreso' AS tipo_movimiento, 'retiro' AS origen_modulo,
+                   CONCAT('Retiro ', COALESCE(e.numero_documento, CONCAT('#', e.id)), ' · ', COALESCE(e.proveedor_destinatario, ''), ' · ', COALESCE(e.descripcion, '')) AS descripcion,
+                   0 AS ingreso, e.monto AS egreso, 0 AS socio_id, '' AS socio_rut, COALESCE(e.proveedor_destinatario, '') AS socio_nombre
+            FROM egresos e
+            WHERE (e.deleted_at IS NULL) AND e.estado <> 'anulado' {$dateWhereEgresos}
+        ";
+
+        $stmt = $db->prepare($sql);
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
+        $stmt->execute();
+        $allRows = $stmt->fetchAll();
+
+        $socioFilter = (int) ($extraFilters['socio_id'] ?? 0);
+        $socioFilterRut = '';
+        $socioFilterNombre = '';
+        if ($socioFilter > 0) {
+            $stmtSocio = $db->prepare('SELECT nombre_completo, rut FROM socios WHERE id = :id LIMIT 1');
+            $stmtSocio->bindValue(':id', $socioFilter, \PDO::PARAM_INT);
+            $stmtSocio->execute();
+            $socioRow = $stmtSocio->fetch() ?: [];
+            $socioFilterRut = mb_strtolower(trim((string) ($socioRow['rut'] ?? '')));
+            $socioFilterNombre = mb_strtolower(trim((string) ($socioRow['nombre_completo'] ?? '')));
+        }
+        $montoMin = (string) ($extraFilters['monto_min'] ?? '');
+        $montoMax = (string) ($extraFilters['monto_max'] ?? '');
+        $queryLower = mb_strtolower(trim($query));
+
+        $filtered = array_values(array_filter($allRows, static function (array $row) use ($status, $socioFilter, $socioFilterRut, $socioFilterNombre, $montoMin, $montoMax, $queryLower): bool {
+            $tipo = (string) ($row['tipo_movimiento'] ?? '');
+            if ($status !== '' && $tipo !== $status) {
+                return false;
+            }
+
+            if ($socioFilter > 0) {
+                $rowSocioId = (int) ($row['socio_id'] ?? 0);
+                $textHaystack = mb_strtolower(trim((string) (($row['descripcion'] ?? '') . ' ' . ($row['socio_rut'] ?? '') . ' ' . ($row['socio_nombre'] ?? ''))));
+                $matchesByText = ($socioFilterRut !== '' && str_contains($textHaystack, $socioFilterRut))
+                    || ($socioFilterNombre !== '' && str_contains($textHaystack, $socioFilterNombre));
+                if ($rowSocioId !== $socioFilter && !$matchesByText) {
+                    return false;
+                }
+            }
+
+            $monto = (float) (($row['ingreso'] ?? 0) > 0 ? ($row['ingreso'] ?? 0) : ($row['egreso'] ?? 0));
+            if ($montoMin !== '' && is_numeric($montoMin) && $monto < (float) $montoMin) {
+                return false;
+            }
+            if ($montoMax !== '' && is_numeric($montoMax) && $monto > (float) $montoMax) {
+                return false;
+            }
+
+            if ($queryLower !== '') {
+                $haystack = mb_strtolower(trim((string) (($row['descripcion'] ?? '') . ' ' . ($row['origen_modulo'] ?? '') . ' ' . ($row['socio_nombre'] ?? '') . ' ' . ($row['socio_rut'] ?? ''))));
+                if (!str_contains($haystack, $queryLower)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }));
+
+        usort($filtered, static function (array $a, array $b): int {
+            return strcmp((string) ($b['fecha'] ?? ''), (string) ($a['fecha'] ?? ''));
+        });
+
+        $total = count($filtered);
+        $pages = max(1, (int) ceil($total / $perPage));
+        $offset = max(0, ($page - 1) * $perPage);
+        $rows = array_slice($filtered, $offset, $perPage);
+
+        $statusCounts = ['ingreso' => 0, 'egreso' => 0];
+        foreach ($filtered as $row) {
+            $type = (string) ($row['tipo_movimiento'] ?? '');
+            if (!isset($statusCounts[$type])) {
+                $statusCounts[$type] = 0;
+            }
+            $statusCounts[$type]++;
+        }
+
+        return [
+            'rows' => $rows,
+            'filtered_rows' => $filtered,
+            'total' => $total,
+            'pages' => $pages,
+            'status_counts' => $statusCounts,
+        ];
     }
 }
