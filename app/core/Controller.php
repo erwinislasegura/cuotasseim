@@ -286,6 +286,112 @@ abstract class Controller
                 ], $data['columns']['all']));
             }
 
+            if ($config['table'] === 'egresos') {
+                $formFields = array_values(array_intersect([
+                    'fecha',
+                    'tipo_egreso_id',
+                    'descripcion',
+                    'numero_documento',
+                    'monto',
+                    'proveedor_destinatario',
+                ], $data['columns']['form']));
+
+                $formMeta = [
+                    'types' => [
+                        'fecha' => 'date',
+                        'descripcion' => 'textarea',
+                        'monto' => 'number',
+                    ],
+                    'labels' => [
+                        'fecha' => 'Fecha del retiro',
+                        'tipo_egreso_id' => 'Tipo de retiro',
+                        'proveedor_destinatario' => 'Retirado por / destinatario',
+                        'descripcion' => 'Motivo del retiro',
+                        'numero_documento' => 'N° comprobante',
+                        'monto' => 'Monto retirado',
+                    ],
+                    'readonly' => [
+                        'numero_documento' => true,
+                        'proveedor_destinatario' => true,
+                    ],
+                    'required' => [
+                        'fecha' => true,
+                        'tipo_egreso_id' => true,
+                        'descripcion' => true,
+                        'monto' => true,
+                        'proveedor_destinatario' => true,
+                    ],
+                    'attributes' => [
+                        'fecha' => ['max' => date('Y-m-d')],
+                        'descripcion' => ['placeholder' => 'Detalle breve del motivo del retiro'],
+                        'monto' => ['step' => '0.01', 'min' => '0.01', 'placeholder' => '0.00'],
+                    ],
+                ];
+                $columnLabels = $formMeta['labels'];
+
+                $tiposEgresoStmt = Database::connection()->query('SELECT id, nombre FROM tipos_egreso WHERE activo = 1 ORDER BY nombre ASC');
+                $formMeta['options']['tipo_egreso_id'] = array_map(static fn(array $item): array => [
+                    'value' => (string) ($item['id'] ?? ''),
+                    'label' => (string) ($item['nombre'] ?? ''),
+                ], $tiposEgresoStmt->fetchAll());
+
+                $formMeta['forma_retiro_options'] = [
+                    ['value' => 'transferencia', 'label' => 'Transferencia'],
+                    ['value' => 'efectivo', 'label' => 'Efectivo'],
+                    ['value' => 'cheque', 'label' => 'Cheque'],
+                    ['value' => 'deposito', 'label' => 'Depósito'],
+                    ['value' => 'otro', 'label' => 'Otro'],
+                ];
+
+                $sociosStmt = Database::connection()->query('SELECT id, nombre_completo, rut, numero_socio, telefono, correo FROM socios WHERE deleted_at IS NULL ORDER BY nombre_completo ASC');
+                $socios = $sociosStmt->fetchAll();
+                $formMeta['retirante_socios_options'] = array_map(static function (array $item): array {
+                    $nombre = trim((string) ($item['nombre_completo'] ?? ''));
+                    $rut = trim((string) ($item['rut'] ?? ''));
+                    $label = $nombre !== '' ? $nombre : ('Socio #' . (string) ($item['id'] ?? ''));
+                    if ($rut !== '') {
+                        $label .= ' · ' . $rut;
+                    }
+
+                    return [
+                        'value' => (string) ($item['id'] ?? ''),
+                        'label' => $label,
+                    ];
+                }, $socios);
+                $formMeta['retirante_socios_data'] = array_reduce($socios, static function (array $carry, array $item): array {
+                    $id = (int) ($item['id'] ?? 0);
+                    if ($id <= 0) {
+                        return $carry;
+                    }
+
+                    $carry[$id] = [
+                        'nombre_completo' => trim((string) ($item['nombre_completo'] ?? '')),
+                        'rut' => trim((string) ($item['rut'] ?? '')),
+                        'numero_socio' => trim((string) ($item['numero_socio'] ?? '')),
+                        'telefono' => trim((string) ($item['telefono'] ?? '')),
+                        'correo' => trim((string) ($item['correo'] ?? '')),
+                    ];
+
+                    return $carry;
+                }, []);
+
+                if ($currentRecord === null) {
+                    $currentRecord = [
+                        'fecha' => date('Y-m-d'),
+                        'numero_documento' => ModuleCatalog::nextEgresoDocumentNumber(),
+                        'proveedor_destinatario' => '',
+                    ];
+                } elseif (empty($currentRecord['numero_documento'])) {
+                    $currentRecord['numero_documento'] = ModuleCatalog::nextEgresoDocumentNumber();
+                }
+
+                $currentRecord['_forma_retiro'] = '';
+                $observacion = trim((string) ($currentRecord['observacion'] ?? ''));
+                if (preg_match('/^Forma de retiro:\s*(.+)$/i', $observacion, $matches) === 1) {
+                    $currentRecord['_forma_retiro'] = strtolower(trim((string) ($matches[1] ?? '')));
+                }
+            }
+
 
             $flashSuccess = $_SESSION['flash_success'] ?? null;
             $flashError = $_SESSION['flash_error'] ?? null;
