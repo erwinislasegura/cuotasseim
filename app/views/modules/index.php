@@ -748,6 +748,23 @@ $reportQueryParams = array_merge([
             <?php endforeach; ?>
           <?php endif; ?>
         </tbody>
+        <?php if (($route ?? '') === 'rendiciones'): ?>
+          <?php
+            $totalIngresosTabla = (float) ($moduleSummary['total_ingresos'] ?? 0);
+            $totalEgresosTabla = (float) ($moduleSummary['total_egresos'] ?? 0);
+            $balanceTabla = (float) ($moduleSummary['balance'] ?? ($totalIngresosTabla - $totalEgresosTabla));
+          ?>
+          <tfoot>
+            <tr class="table-light fw-semibold">
+              <td colspan="5" class="text-end">Totales (según filtros)</td>
+              <td class="text-end">$<?= number_format($totalIngresosTabla, 0, ',', '.') ?></td>
+              <td class="text-end">$<?= number_format($totalEgresosTabla, 0, ',', '.') ?></td>
+              <td class="text-end" style="color:<?= $balanceTabla >= 0 ? '#15803d' : '#b91c1c' ?>">
+                $<?= number_format($balanceTabla, 0, ',', '.') ?>
+              </td>
+            </tr>
+          </tfoot>
+        <?php endif; ?>
       </table>
     </div>
   </div>
