@@ -174,19 +174,6 @@ $statusOptions = [
   </script>
 <?php endif; ?>
 
-<?php if (!empty($viewRecord)): ?>
-  <div class="card mb-3">
-    <div class="card-header py-2"><strong class="card-title mb-0">Ficha resumen</strong></div>
-    <div class="card-body small">
-      <div class="row g-2">
-        <?php foreach ($viewRecord as $field => $value): ?>
-          <div class="col-md-4"><strong><?= htmlspecialchars(ucwords(str_replace('_', ' ', (string) $field))) ?>:</strong> <?= htmlspecialchars((string) $value) ?></div>
-        <?php endforeach; ?>
-      </div>
-    </div>
-  </div>
-<?php endif; ?>
-
 <div class="card">
   <div class="card-header py-2 d-flex justify-content-between align-items-center gap-2 flex-wrap">
     <strong class="card-title mb-0">Listado de registros</strong>
@@ -236,18 +223,19 @@ $statusOptions = [
             <tr><td colspan="<?= (int) (count($columns ?? []) + 2) ?>" class="empty-state">Sin registros para mostrar con los filtros aplicados.</td></tr>
           <?php else: ?>
             <?php foreach (($rows ?? []) as $index => $row): ?>
+              <?php $displayRow = $displayRows[$index] ?? $row; ?>
               <tr>
                 <td><?= (int) (($page - 1) * 10 + $index + 1) ?></td>
                 <?php foreach (($columns ?? []) as $column): ?>
-                  <?php $cellValue = (string) ($row[$column] ?? ''); ?>
+                  <?php $cellValue = (string) ($displayRow[$column] ?? $row[$column] ?? ''); ?>
                   <td>
                     <?php if ($column === ($statusField ?? '__none__')): ?>
                       <?php
-                      $normalized = $cellValue;
+                      $normalized = (string) ($row[$column] ?? '');
                       if ($column === 'activo') {
-                        $normalized = $cellValue === '1' ? 'activo' : 'inactivo';
+                        $normalized = $normalized === '1' ? 'activo' : 'inactivo';
                       } elseif ($column === 'cerrado') {
-                        $normalized = $cellValue === '1' ? 'cerrada' : 'abierta';
+                        $normalized = $normalized === '1' ? 'cerrada' : 'abierta';
                       }
                       ?>
                       <span class="badge badge-status <?= htmlspecialchars(status_badge_class($normalized)) ?>"><?= htmlspecialchars(status_label($normalized)) ?></span>
@@ -257,15 +245,44 @@ $statusOptions = [
                   </td>
                 <?php endforeach; ?>
                 <td class="text-end">
-                  <div class="btn-group btn-group-sm">
-                    <a href="<?= htmlspecialchars(url(($route ?? '') . '?view=' . (int) ($row[$primaryKey] ?? 0))) ?>" class="btn btn-light">Ver</a>
-                    <a href="<?= htmlspecialchars(url(($route ?? '') . '?edit=' . (int) ($row[$primaryKey] ?? 0))) ?>" class="btn btn-outline-secondary <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>">Editar</a>
-                    <form method="post" action="<?= htmlspecialchars(url($route ?? '')) ?>" onsubmit="return confirm('¿Deseas eliminar este registro?');" class="d-inline-block">
-                      <input type="hidden" name="_token" value="<?= htmlspecialchars($token ?? '') ?>">
-                      <input type="hidden" name="_action" value="delete">
-                      <input type="hidden" name="id" value="<?= (int) ($row[$primaryKey] ?? 0) ?>">
-                      <button type="submit" class="btn btn-outline-danger" <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>Eliminar</button>
-                    </form>
+                  <?php
+                    $recordDetails = [];
+                    foreach (($displayRow ?? []) as $field => $value) {
+                      $recordDetails[] = [
+                        'label' => (string) ($columnLabels[$field] ?? ucwords(str_replace('_', ' ', (string) $field))),
+                        'value' => (string) $value,
+                      ];
+                    }
+                    $recordDetailsJson = htmlspecialchars((string) json_encode($recordDetails, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_TAG), ENT_QUOTES, 'UTF-8');
+                  ?>
+                  <div class="dropdown">
+                    <button class="btn btn-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                      Acciones
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li>
+                        <button
+                          type="button"
+                          class="dropdown-item js-open-record-modal"
+                          data-bs-toggle="modal"
+                          data-bs-target="#recordDetailModal"
+                          data-record='<?= $recordDetailsJson ?>'>
+                          Ver detalle
+                        </button>
+                      </li>
+                      <li>
+                        <a href="<?= htmlspecialchars(url(($route ?? '') . '?edit=' . (int) ($row[$primaryKey] ?? 0))) ?>" class="dropdown-item <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>">Editar</a>
+                      </li>
+                      <li><hr class="dropdown-divider"></li>
+                      <li>
+                        <form method="post" action="<?= htmlspecialchars(url($route ?? '')) ?>" onsubmit="return confirm('¿Deseas eliminar este registro?');">
+                          <input type="hidden" name="_token" value="<?= htmlspecialchars($token ?? '') ?>">
+                          <input type="hidden" name="_action" value="delete">
+                          <input type="hidden" name="id" value="<?= (int) ($row[$primaryKey] ?? 0) ?>">
+                          <button type="submit" class="dropdown-item text-danger" <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>Eliminar</button>
+                        </form>
+                      </li>
+                    </ul>
                   </div>
                 </td>
               </tr>
@@ -287,3 +304,70 @@ $statusOptions = [
     </div>
   </div>
 </div>
+
+<div class="modal fade" id="recordDetailModal" tabindex="-1" aria-labelledby="recordDetailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="recordDetailModalLabel">Detalle del registro</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-responsive">
+          <table class="table table-sm table-striped mb-0">
+            <tbody id="recordDetailModalBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const detailModal = document.getElementById('recordDetailModal');
+    const detailBody = document.getElementById('recordDetailModalBody');
+    if (!detailModal || !detailBody) {
+      return;
+    }
+
+    const renderRecordDetails = function (payload) {
+      const details = Array.isArray(payload) ? payload : [];
+      if (details.length === 0) {
+        detailBody.innerHTML = '<tr><td class="text-muted">No hay datos para mostrar.</td></tr>';
+        return;
+      }
+
+      detailBody.innerHTML = details.map(function (item) {
+        const label = item && item.label ? item.label : '';
+        const value = item && item.value ? item.value : '-';
+        return '<tr><th class="w-25">' + label + '</th><td>' + value + '</td></tr>';
+      }).join('');
+    };
+
+    document.querySelectorAll('.js-open-record-modal').forEach(function (trigger) {
+      trigger.addEventListener('click', function () {
+        const rawRecord = trigger.getAttribute('data-record');
+        try {
+          renderRecordDetails(JSON.parse(rawRecord || '[]'));
+        } catch (error) {
+          renderRecordDetails([]);
+        }
+      });
+    });
+
+    <?php if (!empty($viewRecordDisplay)): ?>
+      const initialRecord = <?= json_encode(array_map(static function ($field, $value) use ($columnLabels): array {
+          return [
+            'label' => (string) ($columnLabels[$field] ?? ucwords(str_replace('_', ' ', (string) $field))),
+            'value' => (string) $value,
+          ];
+      }, array_keys($viewRecordDisplay), $viewRecordDisplay), JSON_UNESCAPED_UNICODE) ?>;
+      renderRecordDetails(initialRecord);
+      if (window.bootstrap) {
+        const modalInstance = new window.bootstrap.Modal(detailModal);
+        modalInstance.show();
+      }
+    <?php endif; ?>
+  });
+</script>
