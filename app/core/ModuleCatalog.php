@@ -356,6 +356,26 @@ class ModuleCatalog
                 }
             }
 
+            $formaRetiro = strtolower(trim((string) ($payload['forma_retiro'] ?? '')));
+            if (self::columnExists('egresos', 'observacion')) {
+                $observacion = null;
+                if ($formaRetiro !== '') {
+                    $formaRetiroLabel = ucfirst($formaRetiro);
+                    $observacion = 'Forma de retiro: ' . $formaRetiroLabel;
+                }
+                $data['observacion'] = $observacion;
+                if (!in_array('observacion', $persistFields, true)) {
+                    $persistFields[] = 'observacion';
+                }
+            }
+
+            if (self::columnExists('egresos', 'cuenta_bancaria_id')) {
+                $data['cuenta_bancaria_id'] = null;
+                if (!in_array('cuenta_bancaria_id', $persistFields, true)) {
+                    $persistFields[] = 'cuenta_bancaria_id';
+                }
+            }
+
             if (self::columnExists('egresos', 'estado')) {
                 $data['estado'] = (string) ($data['estado'] ?? 'aplicado');
                 if (!in_array('estado', $persistFields, true)) {

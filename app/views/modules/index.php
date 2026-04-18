@@ -89,6 +89,57 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
           <input type="hidden" name="id" value="<?= (int) ($currentRecord[$primaryKey] ?? 0) ?>">
         <?php endif; ?>
 
+        <?php if (($route ?? '') === 'egresos'): ?>
+          <div class="col-md-4">
+            <label class="form-label">¿Quién retira?</label>
+            <select name="retirante_tipo" id="retiranteTipo" class="form-select form-select-sm" required>
+              <option value="socio">Socio</option>
+              <option value="tercero">Tercero</option>
+            </select>
+          </div>
+          <div class="col-md-8" id="retiranteSocioWrap">
+            <label class="form-label">Seleccionar socio (Nombre · RUT)</label>
+            <select name="retirante_socio_id" id="retiranteSocioId" class="form-select form-select-sm">
+              <option value="">Seleccionar socio...</option>
+              <?php foreach (($formMeta['retirante_socios_options'] ?? []) as $option): ?>
+                <option value="<?= htmlspecialchars((string) ($option['value'] ?? '')) ?>"><?= htmlspecialchars((string) ($option['label'] ?? '')) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="col-12 d-none" id="retiranteSocioInfo">
+            <div class="alert alert-light border small mb-0">
+              <div class="fw-semibold mb-2">Datos del socio que retira</div>
+              <div class="row g-2">
+                <div class="col-md-6"><span class="text-muted">Nombre:</span> <span data-egreso-socio-field="nombre_completo">-</span></div>
+                <div class="col-md-6"><span class="text-muted">RUT:</span> <span data-egreso-socio-field="rut">-</span></div>
+                <div class="col-md-6"><span class="text-muted">N° Socio:</span> <span data-egreso-socio-field="numero_socio">-</span></div>
+                <div class="col-md-6"><span class="text-muted">Teléfono:</span> <span data-egreso-socio-field="telefono">-</span></div>
+                <div class="col-12"><span class="text-muted">Correo:</span> <span data-egreso-socio-field="correo">-</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6 d-none" id="retiranteNombreWrap">
+            <label class="form-label">Nombre del tercero</label>
+            <input type="text" name="retirante_nombre" id="retiranteNombre" class="form-control form-control-sm" placeholder="Nombre completo">
+          </div>
+          <div class="col-md-6 d-none" id="retiranteRutWrap">
+            <label class="form-label">RUT del tercero</label>
+            <input type="text" name="retirante_rut" id="retiranteRut" class="form-control form-control-sm" placeholder="12.345.678-9">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Forma de retiro</label>
+            <select name="forma_retiro" id="formaRetiro" class="form-select form-select-sm" required>
+              <option value="">Seleccionar...</option>
+              <?php foreach (($formMeta['forma_retiro_options'] ?? []) as $option): ?>
+                <?php $selectedFormaRetiro = (string) (($currentRecord['_forma_retiro'] ?? '') ?: ''); ?>
+                <option value="<?= htmlspecialchars((string) ($option['value'] ?? '')) ?>" <?= $selectedFormaRetiro === (string) ($option['value'] ?? '') ? 'selected' : '' ?>>
+                  <?= htmlspecialchars((string) ($option['label'] ?? '')) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+        <?php endif; ?>
+
         <?php foreach (($formFields ?? []) as $field): ?>
           <?php
             $rawFieldValue = $currentRecord[$field] ?? '';
@@ -120,11 +171,13 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
             }
 
             if (($route ?? '') === 'egresos') {
-              if (in_array((string) $field, ['descripcion', 'observacion'], true)) {
+              if ((string) $field === 'proveedor_destinatario') {
+                $fieldClass = 'd-none';
+              } elseif ((string) $field === 'descripcion') {
                 $fieldClass = 'col-12';
-              } elseif (in_array((string) $field, ['tipo_egreso_id', 'proveedor_destinatario'], true)) {
+              } elseif ((string) $field === 'tipo_egreso_id') {
                 $fieldClass = 'col-md-6';
-              } elseif (in_array((string) $field, ['numero_documento', 'monto', 'cuenta_bancaria_id'], true)) {
+              } elseif (in_array((string) $field, ['numero_documento', 'monto'], true)) {
                 $fieldClass = 'col-md-4';
               }
             }
@@ -183,7 +236,7 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
           <div class="col-12">
             <div class="egreso-flow-hint small">
               <i class="bi bi-diagram-3 me-1"></i>
-              Flujo recomendado: fecha → tipo → destinatario → motivo → comprobante → monto → cuenta → observación.
+              Flujo recomendado: tipo de retirante → datos de quien retira → forma de retiro → fecha → tipo → motivo → comprobante → monto.
               Presiona <kbd>Enter</kbd> para avanzar al siguiente campo.
             </div>
             <div id="egresoMontoPreview" class="small text-muted mt-2"></div>
@@ -278,15 +331,28 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
         return;
       }
 
+      const retiranteTipo = document.getElementById('retiranteTipo');
+      const retiranteSocioWrap = document.getElementById('retiranteSocioWrap');
+      const retiranteSocioId = document.getElementById('retiranteSocioId');
+      const retiranteSocioInfo = document.getElementById('retiranteSocioInfo');
+      const retiranteNombreWrap = document.getElementById('retiranteNombreWrap');
+      const retiranteRutWrap = document.getElementById('retiranteRutWrap');
+      const retiranteNombre = document.getElementById('retiranteNombre');
+      const retiranteRut = document.getElementById('retiranteRut');
+      const proveedorDestinatario = form.querySelector('[name="proveedor_destinatario"]');
+      const sociosData = <?= json_encode(($formMeta['retirante_socios_data'] ?? []), JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_TAG) ?>;
+
       const flowFields = [
+        'retirante_tipo',
+        'retirante_socio_id',
+        'retirante_nombre',
+        'retirante_rut',
+        'forma_retiro',
         'fecha',
         'tipo_egreso_id',
-        'proveedor_destinatario',
         'descripcion',
         'numero_documento',
-        'monto',
-        'cuenta_bancaria_id',
-        'observacion'
+        'monto'
       ];
 
       const focusNextField = function (currentName) {
@@ -318,6 +384,62 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
         });
       });
 
+      const syncSocioInfo = function () {
+        if (!retiranteSocioId || !retiranteSocioInfo) {
+          return;
+        }
+        const socioId = retiranteSocioId.value;
+        const socio = sociosData[socioId] || null;
+        if (!socio) {
+          retiranteSocioInfo.classList.add('d-none');
+          return;
+        }
+        retiranteSocioInfo.classList.remove('d-none');
+        retiranteSocioInfo.querySelectorAll('[data-egreso-socio-field]').forEach(function (node) {
+          const field = node.getAttribute('data-egreso-socio-field');
+          const value = socio[field] || '';
+          node.textContent = value !== '' ? value : '-';
+        });
+      };
+
+      const syncRetiranteMode = function () {
+        const isSocio = !retiranteTipo || retiranteTipo.value === 'socio';
+
+        if (retiranteSocioWrap) {
+          retiranteSocioWrap.classList.toggle('d-none', !isSocio);
+        }
+        if (retiranteSocioInfo) {
+          if (!isSocio) {
+            retiranteSocioInfo.classList.add('d-none');
+          } else {
+            syncSocioInfo();
+          }
+        }
+        if (retiranteNombreWrap) {
+          retiranteNombreWrap.classList.toggle('d-none', isSocio);
+        }
+        if (retiranteRutWrap) {
+          retiranteRutWrap.classList.toggle('d-none', isSocio);
+        }
+        if (retiranteSocioId) {
+          retiranteSocioId.required = isSocio;
+        }
+        if (retiranteNombre) {
+          retiranteNombre.required = !isSocio;
+        }
+        if (retiranteRut) {
+          retiranteRut.required = !isSocio;
+        }
+      };
+
+      if (retiranteTipo) {
+        retiranteTipo.addEventListener('change', syncRetiranteMode);
+      }
+      if (retiranteSocioId) {
+        retiranteSocioId.addEventListener('change', syncSocioInfo);
+      }
+      syncRetiranteMode();
+
       const fecha = form.querySelector('[name="fecha"]');
       if (fecha && !fecha.value) {
         fecha.value = new Date().toISOString().slice(0, 10);
@@ -343,7 +465,43 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
         renderMontoPreview();
       }
 
-      const firstField = form.querySelector('[name="fecha"], [name="tipo_egreso_id"], [name="proveedor_destinatario"]');
+      form.addEventListener('submit', function (event) {
+        if (!proveedorDestinatario) {
+          return;
+        }
+
+        const isSocio = !retiranteTipo || retiranteTipo.value === 'socio';
+        if (isSocio) {
+          const socioId = retiranteSocioId ? retiranteSocioId.value : '';
+          const socio = sociosData[socioId] || null;
+          if (!socio) {
+            event.preventDefault();
+            if (retiranteSocioId) {
+              retiranteSocioId.focus();
+            }
+            return;
+          }
+          const nombre = String(socio.nombre_completo || '').trim();
+          const rut = String(socio.rut || '').trim();
+          proveedorDestinatario.value = rut !== '' ? (nombre + ' · ' + rut) : nombre;
+          return;
+        }
+
+        const nombreTercero = retiranteNombre ? retiranteNombre.value.trim() : '';
+        const rutTercero = retiranteRut ? retiranteRut.value.trim() : '';
+        if (nombreTercero === '' || rutTercero === '') {
+          event.preventDefault();
+          if (nombreTercero === '' && retiranteNombre) {
+            retiranteNombre.focus();
+          } else if (retiranteRut) {
+            retiranteRut.focus();
+          }
+          return;
+        }
+        proveedorDestinatario.value = nombreTercero + ' · ' + rutTercero;
+      });
+
+      const firstField = form.querySelector('[name="retirante_tipo"], [name="retirante_socio_id"], [name="fecha"]');
       if (firstField) {
         firstField.focus();
       }
@@ -440,8 +598,7 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
                         'destinatario' => (string) ($row['proveedor_destinatario'] ?? ''),
                         'descripcion' => (string) ($row['descripcion'] ?? ''),
                         'monto' => (string) ($row['monto'] ?? ''),
-                        'cuenta' => (string) ($displayRow['cuenta_bancaria_id'] ?? $row['cuenta_bancaria_id'] ?? ''),
-                        'observacion' => (string) ($row['observacion'] ?? ''),
+                        'forma_retiro' => (string) ($row['observacion'] ?? ''),
                       ];
                     }
                     $egresoPrintPayloadJson = htmlspecialchars((string) json_encode($egresoPrintPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_TAG), ENT_QUOTES, 'UTF-8');
@@ -652,8 +809,8 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
       const destinatario = payload && payload.destinatario ? payload.destinatario : '-';
       const descripcion = payload && payload.descripcion ? payload.descripcion : '-';
       const monto = formatCurrency(payload && payload.monto ? payload.monto : 0);
-      const cuenta = payload && payload.cuenta ? payload.cuenta : '-';
-      const observacion = payload && payload.observacion ? payload.observacion : '-';
+      const formaRetiroRaw = payload && payload.forma_retiro ? payload.forma_retiro : '-';
+      const formaRetiro = String(formaRetiroRaw).replace(/^Forma de retiro:\s*/i, '') || '-';
       const fechaImpresion = new Date().toLocaleString('es-CL');
       const organization = <?= json_encode((string) ($_SESSION['app_name'] ?? 'Sistema de Gestión de Cuotas'), JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_TAG) ?>;
 
@@ -665,8 +822,7 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
         '<tr><th>Tipo de egreso</th><td>' + escapeHtml(tipoEgreso) + '</td></tr>' +
         '<tr><th>Retirado por / destinatario</th><td>' + escapeHtml(destinatario) + '</td></tr>' +
         '<tr><th>Descripción</th><td>' + escapeHtml(descripcion) + '</td></tr>' +
-        '<tr><th>Cuenta de salida</th><td>' + escapeHtml(cuenta) + '</td></tr>' +
-        '<tr><th>Observación</th><td>' + escapeHtml(observacion) + '</td></tr></table>' +
+        '<tr><th>Forma de retiro</th><td>' + escapeHtml(formaRetiro) + '</td></tr></table>' +
         '<div class="amount">Monto: ' + escapeHtml(monto) + '</div>' +
         '<div class="footer"><span>Impreso: ' + escapeHtml(fechaImpresion) + '</span><span>Documento generado por el sistema.</span></div>' +
         '<div class="sign">Firma responsable</div></body></html>';
