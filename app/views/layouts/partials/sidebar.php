@@ -7,7 +7,7 @@ $menu = [
         ['route' => 'panel', 'label' => 'Panel', 'icon' => 'bi-speedometer2'],
         ['route' => 'socios', 'label' => 'Socios', 'icon' => 'bi-people'],
         ['route' => 'periodos', 'label' => 'Planes', 'icon' => 'bi-calendar3'],
-        ['route' => 'cuotas', 'label' => 'Cuotas', 'icon' => 'bi-receipt'],
+        ['route' => 'cuotas', 'label' => 'Registro de cuotas', 'icon' => 'bi-receipt'],
         ['route' => 'pagos', 'label' => 'Pagos', 'icon' => 'bi-credit-card-2-front'],
         ['route' => 'aportes', 'label' => 'Aportes', 'icon' => 'bi-piggy-bank'],
         ['route' => 'egresos', 'label' => 'Egresos', 'icon' => 'bi-cash-stack'],
