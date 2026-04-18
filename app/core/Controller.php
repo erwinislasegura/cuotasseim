@@ -79,6 +79,7 @@ abstract class Controller
             $viewId = isset($_GET['view']) ? (int) $_GET['view'] : null;
             $currentRecord = null;
             $viewRecord = null;
+            $formMeta = [];
 
             if ($editId !== null && $editId > 0) {
                 $currentRecord = ModuleCatalog::findById($config['table'], $primaryKey, $editId);
@@ -86,6 +87,40 @@ abstract class Controller
 
             if ($viewId !== null && $viewId > 0) {
                 $viewRecord = ModuleCatalog::findById($config['table'], $primaryKey, $viewId);
+            }
+
+            if ($config['table'] === 'socios') {
+                $formMeta = [
+                    'types' => [
+                        'fecha_nacimiento' => 'date',
+                        'fecha_ingreso' => 'date',
+                    ],
+                    'readonly' => [
+                        'numero_socio' => true,
+                        'nombre_completo' => true,
+                    ],
+                    'options' => [
+                        'activo' => [
+                            ['value' => '1', 'label' => 'Activo'],
+                            ['value' => '0', 'label' => 'Desactivado'],
+                        ],
+                    ],
+                ];
+
+                $tipoSocioStmt = Database::connection()->query('SELECT id, nombre FROM tipos_socio WHERE activo = 1 ORDER BY nombre ASC');
+                $estadoSocioStmt = Database::connection()->query('SELECT id, nombre FROM estados_socio WHERE activo = 1 ORDER BY nombre ASC');
+                $formMeta['options']['tipo_socio_id'] = array_map(static fn(array $item): array => [
+                    'value' => (string) $item['id'],
+                    'label' => (string) $item['nombre'],
+                ], $tipoSocioStmt->fetchAll());
+                $formMeta['options']['estado_socio_id'] = array_map(static fn(array $item): array => [
+                    'value' => (string) $item['id'],
+                    'label' => (string) $item['nombre'],
+                ], $estadoSocioStmt->fetchAll());
+
+                if ($currentRecord === null) {
+                    $currentRecord = ['numero_socio' => ModuleCatalog::nextSocioNumber()];
+                }
             }
 
             $flashSuccess = $_SESSION['flash_success'] ?? null;
@@ -116,6 +151,7 @@ abstract class Controller
                 'isReadOnly' => $isReadOnly,
                 'flashSuccess' => $flashSuccess,
                 'flashError' => $flashError,
+                'formMeta' => $formMeta,
             ]);
         } catch (Throwable $exception) {
             $this->view('modules/index', [
@@ -141,6 +177,7 @@ abstract class Controller
                 'viewRecord' => null,
                 'isReadOnly' => true,
                 'error' => 'No fue posible cargar el módulo. Verifica la conexión y migraciones de base de datos.',
+                'formMeta' => [],
             ]);
         }
     }
