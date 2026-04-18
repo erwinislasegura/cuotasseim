@@ -15,9 +15,20 @@ $statusOptions = [
   'cerrada' => 'Cerrada',
   'abierta' => 'Abierta',
   'exenta' => 'Exenta',
+  'ingreso' => 'Ingreso',
+  'egreso' => 'Egreso',
 ];
 
 $isPaymentHistory = ($route ?? '') === 'pagos';
+$extraFilters = is_array($extraFilters ?? null) ? $extraFilters : [];
+$extraQueryParams = is_array($extraQueryParams ?? null) ? $extraQueryParams : [];
+$exportQueryParams = array_merge([
+  'q' => (string) ($query ?? ''),
+  'status' => (string) ($status ?? ''),
+  'from' => (string) ($from ?? ''),
+  'to' => (string) ($to ?? ''),
+  'export' => 'excel',
+], $extraQueryParams);
 ?>
 
 <section class="page-header d-flex justify-content-between align-items-start mb-3 gap-2 flex-wrap">
@@ -32,10 +43,10 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
     </nav>
   </div>
   <div class="d-flex gap-2">
-    <?php if (!$isPaymentHistory): ?>
+    <?php if (!$isPaymentHistory && !($isReadOnly ?? false)): ?>
       <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(url($route ?? '')) ?>"><i class="bi bi-plus-circle me-1"></i>Nuevo</a>
     <?php endif; ?>
-    <a class="btn btn-primary btn-sm" href="<?= htmlspecialchars(url(($route ?? '') . '?q=' . urlencode((string) ($query ?? '')) . '&status=' . urlencode((string) ($status ?? '')) . '&from=' . urlencode((string) ($from ?? '')) . '&to=' . urlencode((string) ($to ?? '')) . '&export=excel')) ?>"><i class="bi bi-download me-1"></i>Excel</a>
+    <a class="btn btn-primary btn-sm" href="<?= htmlspecialchars(url(($route ?? '') . '?' . http_build_query($exportQueryParams))) ?>"><i class="bi bi-download me-1"></i>Excel</a>
   </div>
 </section>
 
@@ -78,7 +89,7 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
   <div class="alert alert-danger small mb-3"><?= htmlspecialchars($error) ?></div>
 <?php endif; ?>
 
-<?php if (!$isPaymentHistory): ?>
+<?php if (!$isPaymentHistory && !($isReadOnly ?? false)): ?>
   <div class="card mb-3">
     <div class="card-header py-2"><strong class="card-title mb-0"><?= !empty($currentRecord) ? 'Editar registro' : 'Crear registro' ?></strong></div>
     <div class="card-body py-3">
@@ -534,6 +545,39 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
         <label class="form-label">Hasta</label>
         <input type="date" name="to" class="form-control form-control-sm" value="<?= htmlspecialchars((string) ($to ?? '')) ?>">
       </div>
+      <?php if (($route ?? '') === 'rendiciones'): ?>
+        <div class="col-sm-auto">
+          <label class="form-label">Periodo</label>
+          <select name="periodo" class="form-select form-select-sm">
+            <?php foreach (($formMeta['rendiciones_filter_options']['periodos'] ?? []) as $periodOption): ?>
+              <?php $periodValue = (string) ($periodOption['value'] ?? ''); ?>
+              <option value="<?= htmlspecialchars($periodValue) ?>" <?= (string) ($extraFilters['periodo'] ?? '') === $periodValue ? 'selected' : '' ?>>
+                <?= htmlspecialchars((string) ($periodOption['label'] ?? '')) ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-sm-auto">
+          <label class="form-label">Socio</label>
+          <select name="socio_id" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            <?php foreach (($formMeta['rendiciones_filter_options']['socios'] ?? []) as $socioOption): ?>
+              <?php $socioValue = (string) ($socioOption['value'] ?? ''); ?>
+              <option value="<?= htmlspecialchars($socioValue) ?>" <?= (string) ($extraFilters['socio_id'] ?? '') === $socioValue ? 'selected' : '' ?>>
+                <?= htmlspecialchars((string) ($socioOption['label'] ?? '')) ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-sm-auto">
+          <label class="form-label">Monto min</label>
+          <input type="number" step="0.01" min="0" name="monto_min" value="<?= htmlspecialchars((string) ($extraFilters['monto_min'] ?? '')) ?>" class="form-control form-control-sm" placeholder="0">
+        </div>
+        <div class="col-sm-auto">
+          <label class="form-label">Monto máx</label>
+          <input type="number" step="0.01" min="0" name="monto_max" value="<?= htmlspecialchars((string) ($extraFilters['monto_max'] ?? '')) ?>" class="form-control form-control-sm" placeholder="0">
+        </div>
+      <?php endif; ?>
       <div class="col-sm-auto d-flex gap-2">
         <button class="btn btn-outline-secondary btn-sm" type="submit">Filtrar</button>
         <a class="btn btn-light btn-sm" href="<?= htmlspecialchars(url($route ?? '')) ?>">Limpiar</a>

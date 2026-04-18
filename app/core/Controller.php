@@ -41,9 +41,109 @@ abstract class Controller
         $to = trim((string) ($_GET['to'] ?? ''));
         $page = max(1, (int) ($_GET['page'] ?? 1));
         $perPage = 10;
+        $extraFilters = [];
+        $extraConditions = [];
+        $extraQueryParams = [];
+
+        if (($config['table'] ?? '') === 'rendiciones') {
+            $periodPreset = trim((string) ($_GET['periodo'] ?? ''));
+            $socioId = (int) ($_GET['socio_id'] ?? 0);
+            $montoMin = trim((string) ($_GET['monto_min'] ?? ''));
+            $montoMax = trim((string) ($_GET['monto_max'] ?? ''));
+
+            if ($periodPreset !== '') {
+                $today = new \DateTimeImmutable('today');
+                if ($periodPreset === 'mes_actual') {
+                    $from = $today->modify('first day of this month')->format('Y-m-d');
+                    $to = $today->modify('last day of this month')->format('Y-m-d');
+                } elseif ($periodPreset === 'mes_anterior') {
+                    $previousMonth = $today->modify('first day of last month');
+                    $from = $previousMonth->format('Y-m-d');
+                    $to = $previousMonth->modify('last day of this month')->format('Y-m-d');
+                } elseif ($periodPreset === 'trimestre_actual') {
+                    $month = (int) $today->format('n');
+                    $quarterStartMonth = ((int) floor(($month - 1) / 3) * 3) + 1;
+                    $quarterStart = new \DateTimeImmutable($today->format('Y') . '-' . str_pad((string) $quarterStartMonth, 2, '0', STR_PAD_LEFT) . '-01');
+                    $from = $quarterStart->format('Y-m-d');
+                    $to = $quarterStart->modify('+2 months')->modify('last day of this month')->format('Y-m-d');
+                } elseif ($periodPreset === 'anio_actual') {
+                    $from = $today->modify('first day of january')->format('Y-m-d');
+                    $to = $today->modify('last day of december')->format('Y-m-d');
+                }
+            }
+
+            if ($socioId > 0) {
+                $extraConditions[] = [
+                    'sql' => '(
+                        (origen_modulo = \'pagos\' AND EXISTS (
+                            SELECT 1 FROM pagos p
+                            WHERE p.id = movimientos_tesoreria.referencia_id
+                              AND p.socio_id = :filtro_socio_id
+                        ))
+                        OR
+                        (origen_modulo = \'aportes\' AND EXISTS (
+                            SELECT 1 FROM aportes a
+                            WHERE a.id = movimientos_tesoreria.referencia_id
+                              AND a.socio_id = :filtro_socio_id
+                        ))
+                        OR
+                        (origen_modulo = \'egresos\' AND EXISTS (
+                            SELECT 1
+                            FROM egresos e
+                            INNER JOIN socios s ON s.id = :filtro_socio_id
+                            WHERE e.id = movimientos_tesoreria.referencia_id
+                              AND (
+                                e.proveedor_destinatario LIKE CONCAT(\'%\', COALESCE(s.nombre_completo, \'\'), \'%\')
+                                OR (COALESCE(s.rut, \'\') <> \'\' AND e.proveedor_destinatario LIKE CONCAT(\'%\', s.rut, \'%\'))
+                              )
+                        ))
+                    )',
+                    'params' => [
+                        ':filtro_socio_id' => $socioId,
+                    ],
+                ];
+            }
+
+            if ($montoMin !== '' && is_numeric($montoMin)) {
+                $extraConditions[] = [
+                    'sql' => 'monto_total >= :filtro_monto_min',
+                    'params' => [':filtro_monto_min' => (float) $montoMin],
+                ];
+            }
+
+            if ($montoMax !== '' && is_numeric($montoMax)) {
+                $extraConditions[] = [
+                    'sql' => 'monto_total <= :filtro_monto_max',
+                    'params' => [':filtro_monto_max' => (float) $montoMax],
+                ];
+            }
+
+            $extraFilters = [
+                'periodo' => $periodPreset,
+                'socio_id' => $socioId > 0 ? (string) $socioId : '',
+                'monto_min' => $montoMin,
+                'monto_max' => $montoMax,
+            ];
+
+            foreach ($extraFilters as $key => $value) {
+                if ($value === '') {
+                    continue;
+                }
+                $extraQueryParams[$key] = (string) $value;
+            }
+        }
 
         try {
-            $data = ModuleCatalog::fetchData($config, $query, $page, $perPage, $status !== '' ? $status : null, $from !== '' ? $from : null, $to !== '' ? $to : null);
+            $data = ModuleCatalog::fetchData(
+                $config,
+                $query,
+                $page,
+                $perPage,
+                $status !== '' ? $status : null,
+                $from !== '' ? $from : null,
+                $to !== '' ? $to : null,
+                $extraConditions
+            );
             $columnsMeta = $data['columns'];
             $primaryKey = $columnsMeta['primary'];
             $isReadOnly = (bool) ($config['read_only'] ?? false);
@@ -403,6 +503,57 @@ abstract class Controller
                 ], $data['columns']['all']));
             }
 
+            if ($config['table'] === 'rendiciones') {
+                $sociosStmt = Database::connection()->query('SELECT id, nombre_completo, rut, numero_socio FROM socios WHERE deleted_at IS NULL ORDER BY nombre_completo ASC');
+                $socios = $sociosStmt->fetchAll();
+
+                $columnLabels = [
+                    'fecha' => 'Fecha',
+                    'tipo_movimiento' => 'Tipo',
+                    'origen_modulo' => 'Origen',
+                    'descripcion' => 'Descripción',
+                    'ingreso' => 'Ingreso',
+                    'egreso' => 'Egreso',
+                    'saldo_referencial' => 'Saldo referencial',
+                ];
+                $visibleColumns = array_values(array_intersect([
+                    'fecha',
+                    'tipo_movimiento',
+                    'origen_modulo',
+                    'descripcion',
+                    'ingreso',
+                    'egreso',
+                    'saldo_referencial',
+                ], $data['columns']['all']));
+                $formFields = [];
+                $formMeta['rendiciones_filter_options'] = [
+                    'periodos' => [
+                        ['value' => '', 'label' => 'Manual (Desde/Hasta)'],
+                        ['value' => 'mes_actual', 'label' => 'Mes actual'],
+                        ['value' => 'mes_anterior', 'label' => 'Mes anterior'],
+                        ['value' => 'trimestre_actual', 'label' => 'Trimestre actual'],
+                        ['value' => 'anio_actual', 'label' => 'Año actual'],
+                    ],
+                    'socios' => array_map(static function (array $item): array {
+                        $nombre = trim((string) ($item['nombre_completo'] ?? ''));
+                        $rut = trim((string) ($item['rut'] ?? ''));
+                        $numeroSocio = trim((string) ($item['numero_socio'] ?? ''));
+                        $label = $nombre !== '' ? $nombre : ('Socio #' . (string) ($item['id'] ?? ''));
+                        if ($rut !== '') {
+                            $label .= ' · ' . $rut;
+                        }
+                        if ($numeroSocio !== '') {
+                            $label .= ' · N° ' . $numeroSocio;
+                        }
+
+                        return [
+                            'value' => (string) ($item['id'] ?? ''),
+                            'label' => $label,
+                        ];
+                    }, $socios),
+                ];
+            }
+
 
             $flashSuccess = $_SESSION['flash_success'] ?? null;
             $flashError = $_SESSION['flash_error'] ?? null;
@@ -436,6 +587,8 @@ abstract class Controller
                 'flashError' => $flashError,
                 'formMeta' => $formMeta,
                 'columnLabels' => $columnLabels,
+                'extraFilters' => $extraFilters,
+                'extraQueryParams' => $extraQueryParams,
             ]);
         } catch (Throwable $exception) {
             $this->view('modules/index', [
@@ -465,6 +618,8 @@ abstract class Controller
                 'error' => 'No fue posible cargar el módulo. Verifica la conexión y migraciones de base de datos.',
                 'formMeta' => [],
                 'columnLabels' => [],
+                'extraFilters' => [],
+                'extraQueryParams' => [],
             ]);
         }
     }
