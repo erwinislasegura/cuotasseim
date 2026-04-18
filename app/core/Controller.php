@@ -286,6 +286,81 @@ abstract class Controller
                 ], $data['columns']['all']));
             }
 
+            if ($config['table'] === 'egresos') {
+                $formFields = array_values(array_intersect([
+                    'fecha',
+                    'tipo_egreso_id',
+                    'proveedor_destinatario',
+                    'descripcion',
+                    'numero_documento',
+                    'monto',
+                    'cuenta_bancaria_id',
+                    'observacion',
+                ], $data['columns']['form']));
+
+                $formMeta = [
+                    'types' => [
+                        'fecha' => 'date',
+                        'descripcion' => 'textarea',
+                        'observacion' => 'textarea',
+                        'monto' => 'number',
+                    ],
+                    'labels' => [
+                        'fecha' => 'Fecha del retiro',
+                        'tipo_egreso_id' => 'Tipo de retiro',
+                        'proveedor_destinatario' => 'Retirado por / destinatario',
+                        'descripcion' => 'Motivo del retiro',
+                        'numero_documento' => 'N° documento / comprobante',
+                        'monto' => 'Monto retirado',
+                        'cuenta_bancaria_id' => 'Cuenta de salida',
+                        'observacion' => 'Observación adicional',
+                    ],
+                    'required' => [
+                        'fecha' => true,
+                        'tipo_egreso_id' => true,
+                        'proveedor_destinatario' => true,
+                        'descripcion' => true,
+                        'monto' => true,
+                    ],
+                    'attributes' => [
+                        'fecha' => ['max' => date('Y-m-d')],
+                        'proveedor_destinatario' => ['placeholder' => 'Ej: Juan Pérez / Caja chica'],
+                        'descripcion' => ['placeholder' => 'Detalle breve del motivo del retiro'],
+                        'numero_documento' => ['placeholder' => 'Ej: COMP-2026-00125'],
+                        'monto' => ['step' => '0.01', 'min' => '0.01', 'placeholder' => '0.00'],
+                        'observacion' => ['placeholder' => 'Información extra (opcional)'],
+                    ],
+                ];
+                $columnLabels = $formMeta['labels'];
+
+                $tiposEgresoStmt = Database::connection()->query('SELECT id, nombre FROM tipos_egreso WHERE activo = 1 ORDER BY nombre ASC');
+                $formMeta['options']['tipo_egreso_id'] = array_map(static fn(array $item): array => [
+                    'value' => (string) ($item['id'] ?? ''),
+                    'label' => (string) ($item['nombre'] ?? ''),
+                ], $tiposEgresoStmt->fetchAll());
+
+                if (ModuleCatalog::tableExists('cuentas_bancarias')) {
+                    $cuentasStmt = Database::connection()->query('SELECT id, banco, numero_cuenta, tipo_cuenta FROM cuentas_bancarias WHERE activa = 1 ORDER BY banco ASC, numero_cuenta ASC');
+                    $formMeta['options']['cuenta_bancaria_id'] = array_map(static function (array $item): array {
+                        $banco = trim((string) ($item['banco'] ?? 'Cuenta'));
+                        $tipo = trim((string) ($item['tipo_cuenta'] ?? ''));
+                        $numero = trim((string) ($item['numero_cuenta'] ?? ''));
+                        $label = $banco;
+                        if ($tipo !== '') {
+                            $label .= ' · ' . $tipo;
+                        }
+                        if ($numero !== '') {
+                            $label .= ' · ' . $numero;
+                        }
+
+                        return [
+                            'value' => (string) ($item['id'] ?? ''),
+                            'label' => $label,
+                        ];
+                    }, $cuentasStmt->fetchAll());
+                }
+            }
+
 
             $flashSuccess = $_SESSION['flash_success'] ?? null;
             $flashError = $_SESSION['flash_error'] ?? null;

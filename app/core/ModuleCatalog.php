@@ -337,6 +337,30 @@ class ModuleCatalog
             }
         }
 
+        if ($table === 'egresos') {
+            if (self::columnExists('egresos', 'fecha') && empty($data['fecha'])) {
+                $data['fecha'] = date('Y-m-d');
+                if (!in_array('fecha', $persistFields, true)) {
+                    $persistFields[] = 'fecha';
+                }
+            }
+
+            if (self::columnExists('egresos', 'estado')) {
+                $data['estado'] = (string) ($data['estado'] ?? 'aplicado');
+                if (!in_array('estado', $persistFields, true)) {
+                    $persistFields[] = 'estado';
+                }
+            }
+
+            if (self::columnExists('egresos', 'usuario_id')) {
+                $usuario = Auth::user();
+                $data['usuario_id'] = (string) ((int) ($usuario['id'] ?? $_SESSION['user_id'] ?? 1));
+                if (!in_array('usuario_id', $persistFields, true)) {
+                    $persistFields[] = 'usuario_id';
+                }
+            }
+        }
+
         $db = Database::connection();
 
         if ($id !== null) {

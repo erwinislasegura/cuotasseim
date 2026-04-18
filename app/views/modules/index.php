@@ -118,8 +118,26 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
                 $fieldClass = 'col-12';
               }
             }
+
+            if (($route ?? '') === 'egresos') {
+              if (in_array((string) $field, ['descripcion', 'observacion'], true)) {
+                $fieldClass = 'col-12';
+              } elseif (in_array((string) $field, ['tipo_egreso_id', 'proveedor_destinatario'], true)) {
+                $fieldClass = 'col-md-6';
+              } elseif (in_array((string) $field, ['numero_documento', 'monto', 'cuenta_bancaria_id'], true)) {
+                $fieldClass = 'col-md-4';
+              }
+            }
           ?>
-          <div class="<?= htmlspecialchars($fieldClass) ?>">
+          <?php
+            $isRequiredField = (bool) ($formMeta['required'][$field] ?? false);
+            $fieldAttributes = $formMeta['attributes'][$field] ?? [];
+            $attributeString = '';
+            foreach ($fieldAttributes as $attributeName => $attributeValue) {
+              $attributeString .= ' ' . htmlspecialchars((string) $attributeName) . '="' . htmlspecialchars((string) $attributeValue) . '"';
+            }
+          ?>
+          <div class="<?= htmlspecialchars($fieldClass) ?>" data-flow-order="<?= htmlspecialchars((string) $field) ?>">
             <label class="form-label"><?= htmlspecialchars($fieldLabel) ?></label>
             <?php if (is_array($fieldOptions)): ?>
               <?php
@@ -132,7 +150,7 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
                   $selectedValues = array_map(static fn($item): string => (string) $item, $rawValues);
                 }
               ?>
-              <select name="<?= htmlspecialchars((string) $field) ?><?= $isMultipleField ? '[]' : '' ?>" class="form-select form-select-sm" <?= $isReadOnlyField ? 'disabled' : '' ?> <?= $isMultipleField ? 'multiple size=\"5\"' : '' ?>>
+              <select name="<?= htmlspecialchars((string) $field) ?><?= $isMultipleField ? '[]' : '' ?>" class="form-select form-select-sm" <?= $isReadOnlyField ? 'disabled' : '' ?> <?= $isMultipleField ? 'multiple size=\"5\"' : '' ?> <?= $isRequiredField ? 'required' : '' ?><?= $attributeString ?>>
                 <?php if (!$isMultipleField): ?>
                   <option value="">Seleccionar...</option>
                 <?php endif; ?>
@@ -153,13 +171,24 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
               <?php endif; ?>
             <?php else: ?>
               <?php if ($fieldType === 'textarea'): ?>
-                <textarea name="<?= htmlspecialchars((string) $field) ?>" class="form-control form-control-sm" rows="3" <?= $isReadOnlyField ? 'readonly' : '' ?> <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>><?= htmlspecialchars($value) ?></textarea>
+                <textarea name="<?= htmlspecialchars((string) $field) ?>" class="form-control form-control-sm" rows="3" <?= $isReadOnlyField ? 'readonly' : '' ?> <?= ($isReadOnly ?? false) ? 'disabled' : '' ?> <?= $isRequiredField ? 'required' : '' ?><?= $attributeString ?>><?= htmlspecialchars($value) ?></textarea>
               <?php else: ?>
-                <input type="<?= htmlspecialchars($fieldType) ?>" name="<?= htmlspecialchars((string) $field) ?>" value="<?= htmlspecialchars($value) ?>" class="form-control form-control-sm" <?= $isReadOnlyField ? 'readonly' : '' ?> <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>
+                <input type="<?= htmlspecialchars($fieldType) ?>" name="<?= htmlspecialchars((string) $field) ?>" value="<?= htmlspecialchars($value) ?>" class="form-control form-control-sm" <?= $isReadOnlyField ? 'readonly' : '' ?> <?= ($isReadOnly ?? false) ? 'disabled' : '' ?> <?= $isRequiredField ? 'required' : '' ?><?= $attributeString ?>>
               <?php endif; ?>
             <?php endif; ?>
           </div>
         <?php endforeach; ?>
+
+        <?php if (($route ?? '') === 'egresos'): ?>
+          <div class="col-12">
+            <div class="egreso-flow-hint small">
+              <i class="bi bi-diagram-3 me-1"></i>
+              Flujo recomendado: fecha → tipo → destinatario → motivo → comprobante → monto → cuenta → observación.
+              Presiona <kbd>Enter</kbd> para avanzar al siguiente campo.
+            </div>
+            <div id="egresoMontoPreview" class="small text-muted mt-2"></div>
+          </div>
+        <?php endif; ?>
 
         <div class="col-12 mt-2 d-flex gap-2 flex-wrap">
           <button type="submit" class="btn btn-primary btn-sm" <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>Guardar</button>
@@ -237,6 +266,87 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
 
       socioSelect.addEventListener('change', updateSocioInfo);
       updateSocioInfo();
+    });
+  </script>
+<?php endif; ?>
+
+<?php if (($route ?? '') === 'egresos'): ?>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const form = document.querySelector('form[action$="/egresos"]');
+      if (!form) {
+        return;
+      }
+
+      const flowFields = [
+        'fecha',
+        'tipo_egreso_id',
+        'proveedor_destinatario',
+        'descripcion',
+        'numero_documento',
+        'monto',
+        'cuenta_bancaria_id',
+        'observacion'
+      ];
+
+      const focusNextField = function (currentName) {
+        const currentIndex = flowFields.indexOf(currentName);
+        if (currentIndex < 0) {
+          return;
+        }
+        const nextName = flowFields[currentIndex + 1];
+        if (!nextName) {
+          return;
+        }
+        const nextField = form.querySelector('[name="' + nextName + '"]');
+        if (nextField && !nextField.disabled && !nextField.readOnly) {
+          nextField.focus();
+        }
+      };
+
+      flowFields.forEach(function (fieldName) {
+        const field = form.querySelector('[name="' + fieldName + '"]');
+        if (!field) {
+          return;
+        }
+
+        field.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter' && field.tagName !== 'TEXTAREA') {
+            event.preventDefault();
+            focusNextField(fieldName);
+          }
+        });
+      });
+
+      const fecha = form.querySelector('[name="fecha"]');
+      if (fecha && !fecha.value) {
+        fecha.value = new Date().toISOString().slice(0, 10);
+      }
+
+      const montoInput = form.querySelector('[name="monto"]');
+      const montoPreview = document.getElementById('egresoMontoPreview');
+      const renderMontoPreview = function () {
+        if (!montoInput || !montoPreview) {
+          return;
+        }
+        const value = Number(montoInput.value || 0);
+        if (value <= 0) {
+          montoPreview.textContent = '';
+          return;
+        }
+        const formatted = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value);
+        montoPreview.textContent = 'Monto con formato: ' + formatted;
+      };
+
+      if (montoInput) {
+        montoInput.addEventListener('input', renderMontoPreview);
+        renderMontoPreview();
+      }
+
+      const firstField = form.querySelector('[name="fecha"], [name="tipo_egreso_id"], [name="proveedor_destinatario"]');
+      if (firstField) {
+        firstField.focus();
+      }
     });
   </script>
 <?php endif; ?>
