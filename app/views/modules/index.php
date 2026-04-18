@@ -85,22 +85,57 @@ $statusOptions = [
       <?php endif; ?>
 
       <?php foreach (($formFields ?? []) as $field): ?>
-        <?php $value = (string) (($currentRecord[$field] ?? '') ?: ''); ?>
+        <?php
+          $rawFieldValue = $currentRecord[$field] ?? '';
+          $value = is_array($rawFieldValue) ? '' : (string) ($rawFieldValue ?: '');
+        ?>
         <?php $fieldType = (string) (($formMeta['types'][$field] ?? 'text')); ?>
         <?php $isReadOnlyField = (bool) (($formMeta['readonly'][$field] ?? false) || ($isReadOnly ?? false)); ?>
         <?php $fieldOptions = $formMeta['options'][$field] ?? null; ?>
+        <?php $isMultipleField = (bool) ($formMeta['multiple'][$field] ?? false); ?>
         <?php $fieldLabel = (string) (($formMeta['labels'][$field] ?? ucwords(str_replace('_', ' ', (string) $field)))); ?>
-        <div class="col-md-4 col-lg-3">
+        <?php
+          $fieldClass = 'col-md-4 col-lg-3';
+          if (($route ?? '') === 'socios') {
+            if (in_array((string) $field, ['direccion', 'observaciones', 'planes_ids'], true)) {
+              $fieldClass = 'col-12';
+            } elseif (in_array((string) $field, ['nombres', 'apellidos', 'correo'], true)) {
+              $fieldClass = 'col-md-6 col-lg-4';
+            }
+          }
+        ?>
+        <div class="<?= htmlspecialchars($fieldClass) ?>">
           <label class="form-label"><?= htmlspecialchars($fieldLabel) ?></label>
           <?php if (is_array($fieldOptions)): ?>
-            <select name="<?= htmlspecialchars((string) $field) ?>" class="form-select form-select-sm" <?= $isReadOnlyField ? 'disabled' : '' ?>>
-              <option value="">Seleccionar...</option>
+            <?php
+              $selectedValues = [];
+              if ($isMultipleField) {
+                $rawValues = $currentRecord[$field] ?? [];
+                if (!is_array($rawValues)) {
+                  $rawValues = $rawValues === null || $rawValues === '' ? [] : [(string) $rawValues];
+                }
+                $selectedValues = array_map(static fn($item): string => (string) $item, $rawValues);
+              }
+            ?>
+            <select name="<?= htmlspecialchars((string) $field) ?><?= $isMultipleField ? '[]' : '' ?>" class="form-select form-select-sm" <?= $isReadOnlyField ? 'disabled' : '' ?> <?= $isMultipleField ? 'multiple size=\"5\"' : '' ?>>
+              <?php if (!$isMultipleField): ?>
+                <option value="">Seleccionar...</option>
+              <?php endif; ?>
               <?php foreach ($fieldOptions as $option): ?>
-                <option value="<?= htmlspecialchars((string) ($option['value'] ?? '')) ?>" <?= $value === (string) ($option['value'] ?? '') ? 'selected' : '' ?>>
+                <?php
+                  $optionValue = (string) ($option['value'] ?? '');
+                  $isSelected = $isMultipleField
+                    ? in_array($optionValue, $selectedValues, true)
+                    : $value === $optionValue;
+                ?>
+                <option value="<?= htmlspecialchars($optionValue) ?>" <?= $isSelected ? 'selected' : '' ?>>
                   <?= htmlspecialchars((string) ($option['label'] ?? '')) ?>
                 </option>
               <?php endforeach; ?>
             </select>
+            <?php if ($isMultipleField): ?>
+              <small class="text-muted">Puedes seleccionar más de un plan (Ctrl/Cmd + clic).</small>
+            <?php endif; ?>
           <?php else: ?>
             <input type="<?= htmlspecialchars($fieldType) ?>" name="<?= htmlspecialchars((string) $field) ?>" value="<?= htmlspecialchars($value) ?>" class="form-control form-control-sm" <?= $isReadOnlyField ? 'readonly' : '' ?> <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>
           <?php endif; ?>
