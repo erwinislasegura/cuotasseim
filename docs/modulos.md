@@ -4,7 +4,7 @@ Panel, Socios, Cuotas, Pagos, Aportes, Egresos, Rendiciones, Tesorería, Reporte
 Cada módulo está preconectado bajo MVC y rutas limpias para crecer con CRUD completo.
 
 ## Tesorería (automatizada)
-- La vista de **Tesorería** es de solo lectura para resguardar la trazabilidad financiera.
+- La vista de **Tesorería** permite registrar movimientos manuales (origen `manual`) desde un formulario dedicado.
 - Los movimientos se generan y actualizan automáticamente desde:
   - **Pagos** (ingresos).
   - **Aportes** (ingresos).

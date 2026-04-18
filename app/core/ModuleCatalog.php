@@ -401,6 +401,58 @@ class ModuleCatalog
             }
         }
 
+        if ($table === 'movimientos_tesoreria') {
+            if (empty($data['fecha'])) {
+                $data['fecha'] = date('Y-m-d');
+                if (!in_array('fecha', $persistFields, true)) {
+                    $persistFields[] = 'fecha';
+                }
+            }
+
+            $tipo = strtolower(trim((string) ($data['tipo_movimiento'] ?? 'ingreso')));
+            if (!in_array($tipo, ['ingreso', 'egreso'], true)) {
+                $tipo = 'ingreso';
+            }
+            $data['tipo_movimiento'] = $tipo;
+            if (!in_array('tipo_movimiento', $persistFields, true)) {
+                $persistFields[] = 'tipo_movimiento';
+            }
+
+            $ingreso = (float) ($data['ingreso'] ?? 0);
+            $egreso = (float) ($data['egreso'] ?? 0);
+            if ($tipo === 'ingreso') {
+                $ingreso = $ingreso > 0 ? $ingreso : 0;
+                $egreso = 0.0;
+            } else {
+                $egreso = $egreso > 0 ? $egreso : 0;
+                $ingreso = 0.0;
+            }
+            $data['ingreso'] = (string) $ingreso;
+            $data['egreso'] = (string) $egreso;
+            if (!in_array('ingreso', $persistFields, true)) {
+                $persistFields[] = 'ingreso';
+            }
+            if (!in_array('egreso', $persistFields, true)) {
+                $persistFields[] = 'egreso';
+            }
+
+            $data['origen_modulo'] = trim((string) ($data['origen_modulo'] ?? 'manual')) ?: 'manual';
+            if (!in_array('origen_modulo', $persistFields, true)) {
+                $persistFields[] = 'origen_modulo';
+            }
+
+            $referenciaId = (int) ($data['referencia_id'] ?? 0);
+            $data['referencia_id'] = $referenciaId > 0 ? (string) $referenciaId : null;
+            if (!in_array('referencia_id', $persistFields, true)) {
+                $persistFields[] = 'referencia_id';
+            }
+
+            if (!in_array('saldo_referencial', $persistFields, true)) {
+                $persistFields[] = 'saldo_referencial';
+            }
+            $data['saldo_referencial'] = '0';
+        }
+
         $db = Database::connection();
 
         if ($id !== null) {
@@ -422,6 +474,9 @@ class ModuleCatalog
 
             if ($table === 'socios' && self::tableExists('socio_planes')) {
                 self::syncSocioPlanes($id, self::normalizeIds($payload['planes_ids'] ?? []));
+            }
+            if ($table === 'movimientos_tesoreria') {
+                self::recalculateTreasuryBalance();
             }
             return;
         }
@@ -452,6 +507,9 @@ class ModuleCatalog
             if ($socioId > 0) {
                 self::syncSocioPlanes($socioId, self::normalizeIds($payload['planes_ids'] ?? []));
             }
+        }
+        if ($table === 'movimientos_tesoreria') {
+            self::recalculateTreasuryBalance();
         }
     }
 
@@ -569,6 +627,9 @@ class ModuleCatalog
 
         if (in_array($table, ['pagos', 'aportes', 'egresos'], true)) {
             self::deleteTreasuryMovement($table, $id);
+            self::recalculateTreasuryBalance();
+        }
+        if ($table === 'movimientos_tesoreria') {
             self::recalculateTreasuryBalance();
         }
     }
