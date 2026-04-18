@@ -89,6 +89,57 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
           <input type="hidden" name="id" value="<?= (int) ($currentRecord[$primaryKey] ?? 0) ?>">
         <?php endif; ?>
 
+        <?php if (($route ?? '') === 'egresos'): ?>
+          <div class="col-md-4">
+            <label class="form-label">¿Quién retira?</label>
+            <select name="retirante_tipo" id="retiranteTipo" class="form-select form-select-sm" required>
+              <option value="socio">Socio</option>
+              <option value="tercero">Tercero</option>
+            </select>
+          </div>
+          <div class="col-md-8" id="retiranteSocioWrap">
+            <label class="form-label">Seleccionar socio (Nombre · RUT)</label>
+            <select name="retirante_socio_id" id="retiranteSocioId" class="form-select form-select-sm">
+              <option value="">Seleccionar socio...</option>
+              <?php foreach (($formMeta['retirante_socios_options'] ?? []) as $option): ?>
+                <option value="<?= htmlspecialchars((string) ($option['value'] ?? '')) ?>"><?= htmlspecialchars((string) ($option['label'] ?? '')) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="col-12 d-none" id="retiranteSocioInfo">
+            <div class="alert alert-light border small mb-0">
+              <div class="fw-semibold mb-2">Datos del socio que retira</div>
+              <div class="row g-2">
+                <div class="col-md-6"><span class="text-muted">Nombre:</span> <span data-egreso-socio-field="nombre_completo">-</span></div>
+                <div class="col-md-6"><span class="text-muted">RUT:</span> <span data-egreso-socio-field="rut">-</span></div>
+                <div class="col-md-6"><span class="text-muted">N° Socio:</span> <span data-egreso-socio-field="numero_socio">-</span></div>
+                <div class="col-md-6"><span class="text-muted">Teléfono:</span> <span data-egreso-socio-field="telefono">-</span></div>
+                <div class="col-12"><span class="text-muted">Correo:</span> <span data-egreso-socio-field="correo">-</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6 d-none" id="retiranteNombreWrap">
+            <label class="form-label">Nombre del tercero</label>
+            <input type="text" name="retirante_nombre" id="retiranteNombre" class="form-control form-control-sm" placeholder="Nombre completo">
+          </div>
+          <div class="col-md-6 d-none" id="retiranteRutWrap">
+            <label class="form-label">RUT del tercero</label>
+            <input type="text" name="retirante_rut" id="retiranteRut" class="form-control form-control-sm" placeholder="12.345.678-9">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Forma de retiro</label>
+            <select name="forma_retiro" id="formaRetiro" class="form-select form-select-sm" required>
+              <option value="">Seleccionar...</option>
+              <?php foreach (($formMeta['forma_retiro_options'] ?? []) as $option): ?>
+                <?php $selectedFormaRetiro = (string) (($currentRecord['_forma_retiro'] ?? '') ?: ''); ?>
+                <option value="<?= htmlspecialchars((string) ($option['value'] ?? '')) ?>" <?= $selectedFormaRetiro === (string) ($option['value'] ?? '') ? 'selected' : '' ?>>
+                  <?= htmlspecialchars((string) ($option['label'] ?? '')) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+        <?php endif; ?>
+
         <?php foreach (($formFields ?? []) as $field): ?>
           <?php
             $rawFieldValue = $currentRecord[$field] ?? '';
@@ -118,8 +169,28 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
                 $fieldClass = 'col-12';
               }
             }
+
+            if (($route ?? '') === 'egresos') {
+              if ((string) $field === 'proveedor_destinatario') {
+                $fieldClass = 'd-none';
+              } elseif ((string) $field === 'descripcion') {
+                $fieldClass = 'col-12';
+              } elseif ((string) $field === 'tipo_egreso_id') {
+                $fieldClass = 'col-md-6';
+              } elseif (in_array((string) $field, ['numero_documento', 'monto'], true)) {
+                $fieldClass = 'col-md-4';
+              }
+            }
           ?>
-          <div class="<?= htmlspecialchars($fieldClass) ?>">
+          <?php
+            $isRequiredField = (bool) ($formMeta['required'][$field] ?? false);
+            $fieldAttributes = $formMeta['attributes'][$field] ?? [];
+            $attributeString = '';
+            foreach ($fieldAttributes as $attributeName => $attributeValue) {
+              $attributeString .= ' ' . htmlspecialchars((string) $attributeName) . '="' . htmlspecialchars((string) $attributeValue) . '"';
+            }
+          ?>
+          <div class="<?= htmlspecialchars($fieldClass) ?>" data-flow-order="<?= htmlspecialchars((string) $field) ?>">
             <label class="form-label"><?= htmlspecialchars($fieldLabel) ?></label>
             <?php if (is_array($fieldOptions)): ?>
               <?php
@@ -132,7 +203,7 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
                   $selectedValues = array_map(static fn($item): string => (string) $item, $rawValues);
                 }
               ?>
-              <select name="<?= htmlspecialchars((string) $field) ?><?= $isMultipleField ? '[]' : '' ?>" class="form-select form-select-sm" <?= $isReadOnlyField ? 'disabled' : '' ?> <?= $isMultipleField ? 'multiple size=\"5\"' : '' ?>>
+              <select name="<?= htmlspecialchars((string) $field) ?><?= $isMultipleField ? '[]' : '' ?>" class="form-select form-select-sm" <?= $isReadOnlyField ? 'disabled' : '' ?> <?= $isMultipleField ? 'multiple size=\"5\"' : '' ?> <?= $isRequiredField ? 'required' : '' ?><?= $attributeString ?>>
                 <?php if (!$isMultipleField): ?>
                   <option value="">Seleccionar...</option>
                 <?php endif; ?>
@@ -153,13 +224,24 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
               <?php endif; ?>
             <?php else: ?>
               <?php if ($fieldType === 'textarea'): ?>
-                <textarea name="<?= htmlspecialchars((string) $field) ?>" class="form-control form-control-sm" rows="3" <?= $isReadOnlyField ? 'readonly' : '' ?> <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>><?= htmlspecialchars($value) ?></textarea>
+                <textarea name="<?= htmlspecialchars((string) $field) ?>" class="form-control form-control-sm" rows="3" <?= $isReadOnlyField ? 'readonly' : '' ?> <?= ($isReadOnly ?? false) ? 'disabled' : '' ?> <?= $isRequiredField ? 'required' : '' ?><?= $attributeString ?>><?= htmlspecialchars($value) ?></textarea>
               <?php else: ?>
-                <input type="<?= htmlspecialchars($fieldType) ?>" name="<?= htmlspecialchars((string) $field) ?>" value="<?= htmlspecialchars($value) ?>" class="form-control form-control-sm" <?= $isReadOnlyField ? 'readonly' : '' ?> <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>
+                <input type="<?= htmlspecialchars($fieldType) ?>" name="<?= htmlspecialchars((string) $field) ?>" value="<?= htmlspecialchars($value) ?>" class="form-control form-control-sm" <?= $isReadOnlyField ? 'readonly' : '' ?> <?= ($isReadOnly ?? false) ? 'disabled' : '' ?> <?= $isRequiredField ? 'required' : '' ?><?= $attributeString ?>>
               <?php endif; ?>
             <?php endif; ?>
           </div>
         <?php endforeach; ?>
+
+        <?php if (($route ?? '') === 'egresos'): ?>
+          <div class="col-12">
+            <div class="egreso-flow-hint small">
+              <i class="bi bi-diagram-3 me-1"></i>
+              Flujo recomendado: tipo de retirante → datos de quien retira → forma de retiro → fecha → tipo → motivo → comprobante → monto.
+              Presiona <kbd>Enter</kbd> para avanzar al siguiente campo.
+            </div>
+            <div id="egresoMontoPreview" class="small text-muted mt-2"></div>
+          </div>
+        <?php endif; ?>
 
         <div class="col-12 mt-2 d-flex gap-2 flex-wrap">
           <button type="submit" class="btn btn-primary btn-sm" <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>Guardar</button>
@@ -241,6 +323,192 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
   </script>
 <?php endif; ?>
 
+<?php if (($route ?? '') === 'egresos'): ?>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const form = document.querySelector('form[action$="/egresos"]');
+      if (!form) {
+        return;
+      }
+
+      const retiranteTipo = document.getElementById('retiranteTipo');
+      const retiranteSocioWrap = document.getElementById('retiranteSocioWrap');
+      const retiranteSocioId = document.getElementById('retiranteSocioId');
+      const retiranteSocioInfo = document.getElementById('retiranteSocioInfo');
+      const retiranteNombreWrap = document.getElementById('retiranteNombreWrap');
+      const retiranteRutWrap = document.getElementById('retiranteRutWrap');
+      const retiranteNombre = document.getElementById('retiranteNombre');
+      const retiranteRut = document.getElementById('retiranteRut');
+      const proveedorDestinatario = form.querySelector('[name="proveedor_destinatario"]');
+      const sociosData = <?= json_encode(($formMeta['retirante_socios_data'] ?? []), JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_TAG) ?>;
+
+      const flowFields = [
+        'retirante_tipo',
+        'retirante_socio_id',
+        'retirante_nombre',
+        'retirante_rut',
+        'forma_retiro',
+        'fecha',
+        'tipo_egreso_id',
+        'descripcion',
+        'numero_documento',
+        'monto'
+      ];
+
+      const focusNextField = function (currentName) {
+        const currentIndex = flowFields.indexOf(currentName);
+        if (currentIndex < 0) {
+          return;
+        }
+        const nextName = flowFields[currentIndex + 1];
+        if (!nextName) {
+          return;
+        }
+        const nextField = form.querySelector('[name="' + nextName + '"]');
+        if (nextField && !nextField.disabled && !nextField.readOnly) {
+          nextField.focus();
+        }
+      };
+
+      flowFields.forEach(function (fieldName) {
+        const field = form.querySelector('[name="' + fieldName + '"]');
+        if (!field) {
+          return;
+        }
+
+        field.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter' && field.tagName !== 'TEXTAREA') {
+            event.preventDefault();
+            focusNextField(fieldName);
+          }
+        });
+      });
+
+      const syncSocioInfo = function () {
+        if (!retiranteSocioId || !retiranteSocioInfo) {
+          return;
+        }
+        const socioId = retiranteSocioId.value;
+        const socio = sociosData[socioId] || null;
+        if (!socio) {
+          retiranteSocioInfo.classList.add('d-none');
+          return;
+        }
+        retiranteSocioInfo.classList.remove('d-none');
+        retiranteSocioInfo.querySelectorAll('[data-egreso-socio-field]').forEach(function (node) {
+          const field = node.getAttribute('data-egreso-socio-field');
+          const value = socio[field] || '';
+          node.textContent = value !== '' ? value : '-';
+        });
+      };
+
+      const syncRetiranteMode = function () {
+        const isSocio = !retiranteTipo || retiranteTipo.value === 'socio';
+
+        if (retiranteSocioWrap) {
+          retiranteSocioWrap.classList.toggle('d-none', !isSocio);
+        }
+        if (retiranteSocioInfo) {
+          if (!isSocio) {
+            retiranteSocioInfo.classList.add('d-none');
+          } else {
+            syncSocioInfo();
+          }
+        }
+        if (retiranteNombreWrap) {
+          retiranteNombreWrap.classList.toggle('d-none', isSocio);
+        }
+        if (retiranteRutWrap) {
+          retiranteRutWrap.classList.toggle('d-none', isSocio);
+        }
+        if (retiranteSocioId) {
+          retiranteSocioId.required = isSocio;
+        }
+        if (retiranteNombre) {
+          retiranteNombre.required = !isSocio;
+        }
+        if (retiranteRut) {
+          retiranteRut.required = !isSocio;
+        }
+      };
+
+      if (retiranteTipo) {
+        retiranteTipo.addEventListener('change', syncRetiranteMode);
+      }
+      if (retiranteSocioId) {
+        retiranteSocioId.addEventListener('change', syncSocioInfo);
+      }
+      syncRetiranteMode();
+
+      const fecha = form.querySelector('[name="fecha"]');
+      if (fecha && !fecha.value) {
+        fecha.value = new Date().toISOString().slice(0, 10);
+      }
+
+      const montoInput = form.querySelector('[name="monto"]');
+      const montoPreview = document.getElementById('egresoMontoPreview');
+      const renderMontoPreview = function () {
+        if (!montoInput || !montoPreview) {
+          return;
+        }
+        const value = Number(montoInput.value || 0);
+        if (value <= 0) {
+          montoPreview.textContent = '';
+          return;
+        }
+        const formatted = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value);
+        montoPreview.textContent = 'Monto con formato: ' + formatted;
+      };
+
+      if (montoInput) {
+        montoInput.addEventListener('input', renderMontoPreview);
+        renderMontoPreview();
+      }
+
+      form.addEventListener('submit', function (event) {
+        if (!proveedorDestinatario) {
+          return;
+        }
+
+        const isSocio = !retiranteTipo || retiranteTipo.value === 'socio';
+        if (isSocio) {
+          const socioId = retiranteSocioId ? retiranteSocioId.value : '';
+          const socio = sociosData[socioId] || null;
+          if (!socio) {
+            event.preventDefault();
+            if (retiranteSocioId) {
+              retiranteSocioId.focus();
+            }
+            return;
+          }
+          const nombre = String(socio.nombre_completo || '').trim();
+          const rut = String(socio.rut || '').trim();
+          proveedorDestinatario.value = rut !== '' ? (nombre + ' · ' + rut) : nombre;
+          return;
+        }
+
+        const nombreTercero = retiranteNombre ? retiranteNombre.value.trim() : '';
+        const rutTercero = retiranteRut ? retiranteRut.value.trim() : '';
+        if (nombreTercero === '' || rutTercero === '') {
+          event.preventDefault();
+          if (nombreTercero === '' && retiranteNombre) {
+            retiranteNombre.focus();
+          } else if (retiranteRut) {
+            retiranteRut.focus();
+          }
+          return;
+        }
+        proveedorDestinatario.value = nombreTercero + ' · ' + rutTercero;
+      });
+
+      const firstField = form.querySelector('[name="retirante_tipo"], [name="retirante_socio_id"], [name="fecha"]');
+      if (firstField) {
+        firstField.focus();
+      }
+    });
+  </script>
+<?php endif; ?>
+
 <div class="card">
   <div class="card-header py-2 d-flex justify-content-between align-items-center gap-2 flex-wrap">
     <strong class="card-title mb-0"><?= $isPaymentHistory ? 'Historial de pagos' : 'Listado de registros' ?></strong>
@@ -314,13 +582,47 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
                 <td class="text-end">
                   <?php
                     $recordDetails = [];
-                    foreach (($displayRow ?? []) as $field => $value) {
+                    $detailFields = array_values(array_unique(array_filter(array_merge(
+                      [(string) ($primaryKey ?? 'id')],
+                      array_map(static fn($item): string => (string) $item, ($formFields ?? []))
+                    ))));
+
+                    foreach ($detailFields as $field) {
+                      $label = (string) ($columnLabels[$field] ?? ucwords(str_replace('_', ' ', $field)));
+                      $value = (string) ($displayRow[$field] ?? $row[$field] ?? '');
+
+                      if ($field === 'proveedor_destinatario' && ($route ?? '') === 'egresos') {
+                        $label = 'Retirado por / destinatario';
+                      }
+
                       $recordDetails[] = [
-                        'label' => (string) ($columnLabels[$field] ?? ucwords(str_replace('_', ' ', (string) $field))),
-                        'value' => (string) $value,
+                        'label' => $label,
+                        'value' => $value,
+                      ];
+                    }
+
+                    if (($route ?? '') === 'egresos') {
+                      $formaRetiro = trim((string) ($row['observacion'] ?? ''));
+                      $formaRetiro = preg_replace('/^Forma de retiro:\s*/i', '', $formaRetiro ?? '') ?? '';
+                      $recordDetails[] = [
+                        'label' => 'Forma de retiro',
+                        'value' => $formaRetiro !== '' ? $formaRetiro : '-',
                       ];
                     }
                     $recordDetailsJson = htmlspecialchars((string) json_encode($recordDetails, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_TAG), ENT_QUOTES, 'UTF-8');
+                    $egresoPrintPayload = [];
+                    if (($route ?? '') === 'egresos') {
+                      $egresoPrintPayload = [
+                        'numero_comprobante' => (string) ($row['numero_documento'] ?? ''),
+                        'fecha' => (string) ($row['fecha'] ?? ''),
+                        'tipo_egreso' => (string) ($displayRow['tipo_egreso_id'] ?? $row['tipo_egreso_id'] ?? ''),
+                        'destinatario' => (string) ($row['proveedor_destinatario'] ?? ''),
+                        'descripcion' => (string) ($row['descripcion'] ?? ''),
+                        'monto' => (string) ($row['monto'] ?? ''),
+                        'forma_retiro' => (string) ($row['observacion'] ?? ''),
+                      ];
+                    }
+                    $egresoPrintPayloadJson = htmlspecialchars((string) json_encode($egresoPrintPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_TAG), ENT_QUOTES, 'UTF-8');
                   ?>
                   <div class="dropdown table-actions-dropdown">
                     <button class="btn btn-light btn-sm dropdown-toggle table-actions-dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -338,6 +640,16 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
                         </button>
                       </li>
                       <?php if (!$isPaymentHistory): ?>
+                        <?php if (($route ?? '') === 'egresos'): ?>
+                          <li>
+                            <button
+                              type="button"
+                              class="dropdown-item js-print-egreso"
+                              data-egreso='<?= $egresoPrintPayloadJson ?>'>
+                              Imprimir comprobante
+                            </button>
+                          </li>
+                        <?php endif; ?>
                         <li>
                           <a href="<?= htmlspecialchars(url(($route ?? '') . '?edit=' . (int) ($row[$primaryKey] ?? 0))) ?>" class="dropdown-item <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>">Editar</a>
                         </li>
@@ -503,13 +815,96 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
       });
     });
 
+    const formatCurrency = function (rawAmount) {
+      const amount = Number(rawAmount || 0);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return '-';
+      }
+      return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(amount);
+    };
+
+    const printEgresoVoucher = function (payload) {
+      const comprobante = payload && payload.numero_comprobante ? payload.numero_comprobante : '-';
+      const fecha = payload && payload.fecha ? payload.fecha : '-';
+      const tipoEgreso = payload && payload.tipo_egreso ? payload.tipo_egreso : '-';
+      const destinatario = payload && payload.destinatario ? payload.destinatario : '-';
+      const descripcion = payload && payload.descripcion ? payload.descripcion : '-';
+      const monto = formatCurrency(payload && payload.monto ? payload.monto : 0);
+      const formaRetiroRaw = payload && payload.forma_retiro ? payload.forma_retiro : '-';
+      const formaRetiro = String(formaRetiroRaw).replace(/^Forma de retiro:\s*/i, '') || '-';
+      const fechaImpresion = new Date().toLocaleString('es-CL');
+      const organization = <?= json_encode((string) ($_SESSION['app_name'] ?? 'Sistema de Gestión de Cuotas'), JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_TAG) ?>;
+
+      const html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Comprobante egreso ' + escapeHtml(comprobante) + '</title>' +
+        '<style>body{font-family:Arial,sans-serif;color:#203040;margin:24px;}h1{font-size:18px;margin:0 0 6px;}small{color:#5a6d82;}table{width:100%;border-collapse:collapse;margin-top:16px;}th,td{border:1px solid #d7e1eb;padding:8px;text-align:left;font-size:13px;}th{background:#f3f8fd;width:34%;}.header{border-bottom:2px solid #1d4c7d;padding-bottom:8px;margin-bottom:10px;}.amount{font-size:20px;font-weight:700;color:#163a5f;text-align:right;margin-top:12px;}.footer{margin-top:24px;font-size:12px;color:#607487;display:flex;justify-content:space-between;}.sign{margin-top:36px;border-top:1px solid #9eb2c7;padding-top:8px;width:240px;}</style>' +
+        '</head><body><div class="header"><h1>Comprobante de Egreso</h1><small>' + escapeHtml(organization) + '</small></div>' +
+        '<table><tr><th>N° comprobante</th><td>' + escapeHtml(comprobante) + '</td></tr>' +
+        '<tr><th>Fecha</th><td>' + escapeHtml(fecha) + '</td></tr>' +
+        '<tr><th>Tipo de egreso</th><td>' + escapeHtml(tipoEgreso) + '</td></tr>' +
+        '<tr><th>Retirado por / destinatario</th><td>' + escapeHtml(destinatario) + '</td></tr>' +
+        '<tr><th>Descripción</th><td>' + escapeHtml(descripcion) + '</td></tr>' +
+        '<tr><th>Forma de retiro</th><td>' + escapeHtml(formaRetiro) + '</td></tr></table>' +
+        '<div class="amount">Monto: ' + escapeHtml(monto) + '</div>' +
+        '<div class="footer"><span>Impreso: ' + escapeHtml(fechaImpresion) + '</span><span>Documento generado por el sistema.</span></div>' +
+        '<div class="sign">Firma responsable</div></body></html>';
+
+      const printWindow = window.open('', '_blank', 'width=900,height=700');
+      if (!printWindow) {
+        return;
+      }
+
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+    };
+
+    document.querySelectorAll('.js-print-egreso').forEach(function (button) {
+      button.addEventListener('click', function () {
+        const rawPayload = button.getAttribute('data-egreso');
+        let payload = {};
+        try {
+          payload = JSON.parse(rawPayload || '{}');
+        } catch (error) {
+          payload = {};
+        }
+        printEgresoVoucher(payload);
+      });
+    });
+
     <?php if (!empty($viewRecordDisplay)): ?>
-      const initialRecord = <?= json_encode(array_map(static function ($field, $value) use ($columnLabels): array {
-          return [
-            'label' => (string) ($columnLabels[$field] ?? ucwords(str_replace('_', ' ', (string) $field))),
-            'value' => (string) $value,
-          ];
-      }, array_keys($viewRecordDisplay), $viewRecordDisplay), JSON_UNESCAPED_UNICODE) ?>;
+      const initialRecord = <?= json_encode((static function () use ($viewRecordDisplay, $formFields, $columnLabels, $primaryKey, $route): array {
+          $details = [];
+          $detailFields = array_values(array_unique(array_filter(array_merge(
+              [(string) ($primaryKey ?? 'id')],
+              array_map(static fn($item): string => (string) $item, ($formFields ?? []))
+          ))));
+
+          foreach ($detailFields as $field) {
+              $label = (string) ($columnLabels[$field] ?? ucwords(str_replace('_', ' ', $field)));
+              $value = (string) ($viewRecordDisplay[$field] ?? '');
+              if ($field === 'proveedor_destinatario' && (string) ($route ?? '') === 'egresos') {
+                  $label = 'Retirado por / destinatario';
+              }
+
+              $details[] = [
+                  'label' => $label,
+                  'value' => $value,
+              ];
+          }
+
+          if ((string) ($route ?? '') === 'egresos') {
+              $formaRetiro = trim((string) ($viewRecordDisplay['observacion'] ?? ''));
+              $formaRetiro = preg_replace('/^Forma de retiro:\s*/i', '', $formaRetiro ?? '') ?? '';
+              $details[] = [
+                  'label' => 'Forma de retiro',
+                  'value' => $formaRetiro !== '' ? $formaRetiro : '-',
+              ];
+          }
+
+          return $details;
+      })(), JSON_UNESCAPED_UNICODE) ?>;
       renderRecordDetails(initialRecord);
       if (window.bootstrap) {
         const modalInstance = new window.bootstrap.Modal(detailModal);
