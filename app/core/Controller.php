@@ -82,6 +82,7 @@ abstract class Controller
             $formMeta = [];
             $formFields = $data['columns']['form'];
             $columnLabels = [];
+            $visibleColumns = $data['columns']['visible'];
 
             if ($editId !== null && $editId > 0) {
                 $currentRecord = ModuleCatalog::findById($config['table'], $primaryKey, $editId);
@@ -89,6 +90,43 @@ abstract class Controller
 
             if ($viewId !== null && $viewId > 0) {
                 $viewRecord = ModuleCatalog::findById($config['table'], $primaryKey, $viewId);
+            }
+
+
+            if ($config['table'] === 'periodos') {
+                $formFields = array_values(array_intersect([
+                    'nombre_periodo',
+                    'tipo_periodo',
+                    'monto_a_pagar',
+                ], $data['columns']['form']));
+
+                $formMeta = [
+                    'types' => [
+                        'monto_a_pagar' => 'number',
+                    ],
+                    'options' => [
+                        'tipo_periodo' => [
+                            ['value' => 'mensual', 'label' => 'Mensual'],
+                            ['value' => 'trimestral', 'label' => 'Trimestral'],
+                            ['value' => 'semestral', 'label' => 'Semestral'],
+                            ['value' => 'anual', 'label' => 'Anual'],
+                        ],
+                    ],
+                    'labels' => [
+                        'nombre_periodo' => 'Nombre del plan',
+                        'tipo_periodo' => 'Frecuencia',
+                        'monto_a_pagar' => 'Monto a pagar',
+                    ],
+                ];
+
+                $columnLabels = $formMeta['labels'];
+                $visibleColumns = array_values(array_intersect([
+                    'id',
+                    'nombre_periodo',
+                    'tipo_periodo',
+                    'monto_a_pagar',
+                    'created_at',
+                ], $data['columns']['all']));
             }
 
             if ($config['table'] === 'socios') {
@@ -113,6 +151,8 @@ abstract class Controller
                 if (!empty($availableFormFields)) {
                     $formFields = $availableFormFields;
                 }
+                $formFields[] = 'planes_ids';
+                $formFields = array_values(array_unique($formFields));
 
                 $formMeta = [
                     'types' => [
@@ -133,6 +173,10 @@ abstract class Controller
                         'tipo_socio_id' => 'Tipo socio',
                         'estado_socio_id' => 'Estado socio',
                         'fecha_ingreso' => 'Fecha de inscripción como socio',
+                        'planes_ids' => 'Planes asociados',
+                    ],
+                    'multiple' => [
+                        'planes_ids' => true,
                     ],
                 ];
                 $columnLabels = $formMeta['labels'];
@@ -147,9 +191,26 @@ abstract class Controller
                     'value' => (string) $item['id'],
                     'label' => (string) $item['nombre'],
                 ], $estadoSocioStmt->fetchAll());
+                $planesStmt = Database::connection()->query('SELECT id, nombre_periodo, tipo_periodo, monto_a_pagar FROM periodos ORDER BY nombre_periodo ASC');
+                $formMeta['options']['planes_ids'] = array_map(static function (array $item): array {
+                    return [
+                        'value' => (string) $item['id'],
+                        'label' => sprintf(
+                            '%s · %s · $%s',
+                            (string) ($item['nombre_periodo'] ?? ''),
+                            ucfirst((string) ($item['tipo_periodo'] ?? '')),
+                            number_format((float) ($item['monto_a_pagar'] ?? 0), 0, ',', '.')
+                        ),
+                    ];
+                }, $planesStmt->fetchAll());
 
                 if ($currentRecord === null) {
-                    $currentRecord = ['numero_socio' => ModuleCatalog::nextSocioNumber()];
+                    $currentRecord = [
+                        'numero_socio' => ModuleCatalog::nextSocioNumber(),
+                        'planes_ids' => [],
+                    ];
+                } else {
+                    $currentRecord['planes_ids'] = ModuleCatalog::fetchSocioPlanes((int) ($currentRecord['id'] ?? 0));
                 }
             }
 
@@ -166,7 +227,7 @@ abstract class Controller
                 'from' => $from,
                 'to' => $to,
                 'rows' => $data['rows'],
-                'columns' => $data['columns']['visible'],
+                'columns' => $visibleColumns,
                 'formFields' => $formFields,
                 'statusField' => $data['columns']['status_field'],
                 'statusCounts' => $data['summary']['status_counts'] ?? [],

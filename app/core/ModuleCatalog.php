@@ -13,7 +13,7 @@ class ModuleCatalog
         $modules = [
             'socios' => ['title' => 'Socios', 'description' => 'Administración del padrón de socios con estado, deuda y seguimiento.', 'table' => 'socios', 'route' => 'socios'],
             'tipos_socio' => ['title' => 'Tipos de socio', 'description' => 'Catálogo de categorías y segmentación de socios.', 'table' => 'tipos_socio', 'route' => 'tipos-socio'],
-            'periodos' => ['title' => 'Periodos', 'description' => 'Gestión de periodos de cobranza y su ciclo operativo.', 'table' => 'periodos', 'route' => 'periodos'],
+            'periodos' => ['title' => 'Planes', 'description' => 'Creación de planes de cobro por frecuencia.', 'table' => 'periodos', 'route' => 'periodos'],
             'conceptos_cobro' => ['title' => 'Conceptos de cobro', 'description' => 'Definición de conceptos recurrentes y extraordinarios.', 'table' => 'conceptos_cobro', 'route' => 'conceptos-cobro'],
             'cuotas' => ['title' => 'Cuotas', 'description' => 'Control de cuotas con foco en morosidad y cobranzas.', 'table' => 'cuotas', 'route' => 'cuotas'],
             'medios_pago' => ['title' => 'Medios de pago', 'description' => 'Catálogo de medios habilitados para recaudación.', 'table' => 'medios_pago', 'route' => 'medios-pago'],
@@ -196,6 +196,12 @@ class ModuleCatalog
             }
         }
 
+        if ($table === 'periodos') {
+            $data['anio'] = (string) ($data['anio'] ?? date('Y'));
+            $data['mes'] = (string) ($data['mes'] ?? date('n'));
+            $data['cerrado'] = (string) ($data['cerrado'] ?? '0');
+        }
+
         $db = Database::connection();
 
         if ($id !== null) {
@@ -210,6 +216,10 @@ class ModuleCatalog
             }
             $stmt->bindValue(':pk', $id, PDO::PARAM_INT);
             $stmt->execute();
+
+            if ($table === 'socios') {
+                self::syncSocioPlanes($id, self::normalizeIds($payload['planes_ids'] ?? []));
+            }
             return;
         }
 
@@ -228,6 +238,66 @@ class ModuleCatalog
             $stmt->bindValue(':' . $field, $value);
         }
         $stmt->execute();
+
+        if ($table === 'socios') {
+            $socioId = (int) $db->lastInsertId();
+            if ($socioId > 0) {
+                self::syncSocioPlanes($socioId, self::normalizeIds($payload['planes_ids'] ?? []));
+            }
+        }
+    }
+
+    public static function fetchSocioPlanes(int $socioId): array
+    {
+        if ($socioId <= 0) {
+            return [];
+        }
+
+        $stmt = Database::connection()->prepare('SELECT periodo_id FROM socio_planes WHERE socio_id = :socio_id ORDER BY periodo_id ASC');
+        $stmt->bindValue(':socio_id', $socioId, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return array_map(static fn(array $row): string => (string) ($row['periodo_id'] ?? ''), $stmt->fetchAll());
+    }
+
+    private static function syncSocioPlanes(int $socioId, array $planIds): void
+    {
+        if ($socioId <= 0) {
+            return;
+        }
+
+        $db = Database::connection();
+        $db->beginTransaction();
+        try {
+            $deleteStmt = $db->prepare('DELETE FROM socio_planes WHERE socio_id = :socio_id');
+            $deleteStmt->bindValue(':socio_id', $socioId, PDO::PARAM_INT);
+            $deleteStmt->execute();
+
+            if (!empty($planIds)) {
+                $insertStmt = $db->prepare('INSERT INTO socio_planes (socio_id, periodo_id) VALUES (:socio_id, :periodo_id)');
+                foreach ($planIds as $planId) {
+                    $insertStmt->bindValue(':socio_id', $socioId, PDO::PARAM_INT);
+                    $insertStmt->bindValue(':periodo_id', $planId, PDO::PARAM_INT);
+                    $insertStmt->execute();
+                }
+            }
+            $db->commit();
+        } catch (\Throwable $exception) {
+            $db->rollBack();
+            throw $exception;
+        }
+    }
+
+    private static function normalizeIds($raw): array
+    {
+        if (!is_array($raw)) {
+            $raw = $raw === null || $raw === '' ? [] : [$raw];
+        }
+
+        $ids = array_map(static fn($item): int => (int) $item, $raw);
+        $ids = array_values(array_unique(array_filter($ids, static fn(int $id): bool => $id > 0)));
+
+        return $ids;
     }
 
     public static function nextSocioNumber(): string
