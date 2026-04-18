@@ -24,6 +24,13 @@ mysql -u root -p < database/seed.sql
 php database/migration_runner.php
 ```
 
+## Limpieza de base de datos (datos operativos)
+Para limpiar datos transaccionales y dejar solo catálogos/configuración base:
+
+```bash
+php database/cleanup.php
+```
+
 ## Accesos seed
 - Usuario: `admin` / Password de ejemplo: `Admin123*`
 - Usuario: `tesorero` / Password de ejemplo: `Admin123*`
