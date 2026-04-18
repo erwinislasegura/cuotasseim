@@ -8,6 +8,11 @@ use PDO;
 
 class ModuleCatalog
 {
+    /** @var array<string,array<string,array{table:string,label_column:string,primary:string}>> */
+    private static array $foreignKeyCache = [];
+    /** @var array<string,array<int,string>> */
+    private static array $foreignLabelCache = [];
+
     public static function config(string $key): ?array
     {
         $modules = [
@@ -170,6 +175,51 @@ class ModuleCatalog
         $row = $stmt->fetch();
 
         return $row ?: null;
+    }
+
+    public static function decorateRowsForDisplay(string $table, array $rows): array
+    {
+        if (empty($rows)) {
+            return [];
+        }
+
+        return array_map(static fn(array $row): array => self::decorateRecordForDisplay($table, $row), $rows);
+    }
+
+    public static function decorateRecordForDisplay(string $table, ?array $record): ?array
+    {
+        if ($record === null) {
+            return null;
+        }
+
+        $db = Database::connection();
+        $foreignKeys = self::foreignKeysForTable($db, $table);
+        if (empty($foreignKeys)) {
+            return $record;
+        }
+
+        foreach ($foreignKeys as $column => $reference) {
+            if (!array_key_exists($column, $record)) {
+                continue;
+            }
+
+            $rawValue = $record[$column];
+            if ($rawValue === null || $rawValue === '') {
+                continue;
+            }
+
+            $id = (int) $rawValue;
+            if ($id <= 0) {
+                continue;
+            }
+
+            $label = self::foreignLabel((string) $reference['table'], (string) $reference['label_column'], $id, (string) $reference['primary']);
+            if ($label !== null && $label !== '') {
+                $record[$column] = $label;
+            }
+        }
+
+        return $record;
     }
 
     public static function save(string $table, string $primaryKey, array $fields, array $payload, ?int $id = null): void
@@ -349,6 +399,88 @@ class ModuleCatalog
         }
 
         return $counts;
+    }
+
+    private static function foreignKeysForTable(PDO $db, string $table): array
+    {
+        if (isset(self::$foreignKeyCache[$table])) {
+            return self::$foreignKeyCache[$table];
+        }
+
+        $sql = 'SELECT COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+            FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = :table
+              AND REFERENCED_TABLE_NAME IS NOT NULL';
+        $stmt = $db->prepare($sql);
+        $stmt->bindValue(':table', $table);
+        $stmt->execute();
+
+        $map = [];
+        foreach ($stmt->fetchAll() as $fk) {
+            $column = (string) ($fk['COLUMN_NAME'] ?? '');
+            $refTable = (string) ($fk['REFERENCED_TABLE_NAME'] ?? '');
+            $refPrimary = (string) ($fk['REFERENCED_COLUMN_NAME'] ?? 'id');
+            if ($column === '' || $refTable === '') {
+                continue;
+            }
+
+            $map[$column] = [
+                'table' => $refTable,
+                'label_column' => self::preferredLabelColumn($db, $refTable),
+                'primary' => $refPrimary,
+            ];
+        }
+
+        self::$foreignKeyCache[$table] = $map;
+
+        return $map;
+    }
+
+    private static function preferredLabelColumn(PDO $db, string $table): string
+    {
+        $stmt = $db->query('SHOW COLUMNS FROM `' . $table . '`');
+        $columns = array_map(static fn(array $column): string => (string) ($column['Field'] ?? ''), $stmt->fetchAll());
+        $priority = [
+            'nombre_completo',
+            'nombre',
+            'nombre_periodo',
+            'numero_socio',
+            'numero_rendicion',
+            'descripcion',
+            'correo',
+            'usuario',
+        ];
+
+        foreach ($priority as $candidate) {
+            if (in_array($candidate, $columns, true)) {
+                return $candidate;
+            }
+        }
+
+        return 'id';
+    }
+
+    private static function foreignLabel(string $table, string $labelColumn, int $id, string $primaryColumn = 'id'): ?string
+    {
+        $cacheKey = $table . '.' . $labelColumn . '.' . $primaryColumn;
+        if (!isset(self::$foreignLabelCache[$cacheKey])) {
+            self::$foreignLabelCache[$cacheKey] = [];
+        }
+
+        if (array_key_exists($id, self::$foreignLabelCache[$cacheKey])) {
+            return self::$foreignLabelCache[$cacheKey][$id];
+        }
+
+        $sql = 'SELECT `' . $labelColumn . '` FROM `' . $table . '` WHERE `' . $primaryColumn . '` = :id LIMIT 1';
+        $stmt = Database::connection()->prepare($sql);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
+        $value = $stmt->fetchColumn();
+
+        self::$foreignLabelCache[$cacheKey][$id] = $value !== false ? (string) $value : null;
+
+        return self::$foreignLabelCache[$cacheKey][$id];
     }
 
     private static function buildWhereSql(array $columnsMeta, string $query, ?string $status, ?string $from, ?string $to): array
