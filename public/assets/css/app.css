@@ -347,3 +347,36 @@ body {
   .module-grid-summary { grid-template-columns: 1fr; }
   .topbar form { width: 100%; }
 }
+
+.cuotas-layout .card { min-height: 0; }
+.cuotas-card-compact .card-body { padding: 0.65rem 0.75rem; }
+.cuotas-card-compact .card-header { padding: 0.5rem 0.75rem; }
+.cuotas-search-form input { width: 230px; }
+.cuotas-socios-scroll { max-height: 62vh; overflow-y: auto; }
+.cuotas-otras-scroll { max-height: 180px; overflow-y: auto; }
+.cuotas-sticky-panel { position: sticky; top: 0.9rem; }
+.cuotas-kv-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+.cuotas-kv-grid div {
+  border: 1px solid var(--ui-border);
+  border-radius: 0.45rem;
+  padding: 0.4rem 0.5rem;
+  background: #fcfdff;
+}
+.cuotas-kv-grid span {
+  display: block;
+  color: #688099;
+  font-size: 0.69rem;
+}
+.cuotas-kv-grid strong {
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+@media (max-width: 991px) {
+  .cuotas-sticky-panel { position: static; }
+  .cuotas-socios-scroll { max-height: 340px; }
+  .cuotas-search-form input { width: 100%; }
+}
