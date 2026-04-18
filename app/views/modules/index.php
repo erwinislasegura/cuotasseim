@@ -582,10 +582,31 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
                 <td class="text-end">
                   <?php
                     $recordDetails = [];
-                    foreach (($displayRow ?? []) as $field => $value) {
+                    $detailFields = array_values(array_unique(array_filter(array_merge(
+                      [(string) ($primaryKey ?? 'id')],
+                      array_map(static fn($item): string => (string) $item, ($formFields ?? []))
+                    ))));
+
+                    foreach ($detailFields as $field) {
+                      $label = (string) ($columnLabels[$field] ?? ucwords(str_replace('_', ' ', $field)));
+                      $value = (string) ($displayRow[$field] ?? $row[$field] ?? '');
+
+                      if ($field === 'proveedor_destinatario' && ($route ?? '') === 'egresos') {
+                        $label = 'Retirado por / destinatario';
+                      }
+
                       $recordDetails[] = [
-                        'label' => (string) ($columnLabels[$field] ?? ucwords(str_replace('_', ' ', (string) $field))),
-                        'value' => (string) $value,
+                        'label' => $label,
+                        'value' => $value,
+                      ];
+                    }
+
+                    if (($route ?? '') === 'egresos') {
+                      $formaRetiro = trim((string) ($row['observacion'] ?? ''));
+                      $formaRetiro = preg_replace('/^Forma de retiro:\s*/i', '', $formaRetiro ?? '') ?? '';
+                      $recordDetails[] = [
+                        'label' => 'Forma de retiro',
+                        'value' => $formaRetiro !== '' ? $formaRetiro : '-',
                       ];
                     }
                     $recordDetailsJson = htmlspecialchars((string) json_encode($recordDetails, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_TAG), ENT_QUOTES, 'UTF-8');
@@ -853,12 +874,37 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
     });
 
     <?php if (!empty($viewRecordDisplay)): ?>
-      const initialRecord = <?= json_encode(array_map(static function ($field, $value) use ($columnLabels): array {
-          return [
-            'label' => (string) ($columnLabels[$field] ?? ucwords(str_replace('_', ' ', (string) $field))),
-            'value' => (string) $value,
-          ];
-      }, array_keys($viewRecordDisplay), $viewRecordDisplay), JSON_UNESCAPED_UNICODE) ?>;
+      const initialRecord = <?= json_encode((static function () use ($viewRecordDisplay, $formFields, $columnLabels, $primaryKey, $route): array {
+          $details = [];
+          $detailFields = array_values(array_unique(array_filter(array_merge(
+              [(string) ($primaryKey ?? 'id')],
+              array_map(static fn($item): string => (string) $item, ($formFields ?? []))
+          ))));
+
+          foreach ($detailFields as $field) {
+              $label = (string) ($columnLabels[$field] ?? ucwords(str_replace('_', ' ', $field)));
+              $value = (string) ($viewRecordDisplay[$field] ?? '');
+              if ($field === 'proveedor_destinatario' && (string) ($route ?? '') === 'egresos') {
+                  $label = 'Retirado por / destinatario';
+              }
+
+              $details[] = [
+                  'label' => $label,
+                  'value' => $value,
+              ];
+          }
+
+          if ((string) ($route ?? '') === 'egresos') {
+              $formaRetiro = trim((string) ($viewRecordDisplay['observacion'] ?? ''));
+              $formaRetiro = preg_replace('/^Forma de retiro:\s*/i', '', $formaRetiro ?? '') ?? '';
+              $details[] = [
+                  'label' => 'Forma de retiro',
+                  'value' => $formaRetiro !== '' ? $formaRetiro : '-',
+              ];
+          }
+
+          return $details;
+      })(), JSON_UNESCAPED_UNICODE) ?>;
       renderRecordDetails(initialRecord);
       if (window.bootstrap) {
         const modalInstance = new window.bootstrap.Modal(detailModal);
