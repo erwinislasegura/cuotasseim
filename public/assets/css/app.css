@@ -3,4 +3,14 @@
 }
 body { font-size: 0.92rem; }
 .card { border-radius: .6rem; }
-.form-control-sm, .btn-sm { border-radius: .45rem; }
+.form-control-sm, .btn-sm, .form-select-sm { border-radius: .45rem; }
+
+.hover-link {
+  border-radius: .4rem;
+  padding: .35rem .5rem;
+}
+.hover-link:hover,
+.hover-link:focus {
+  background: rgba(255,255,255,.1);
+  color: #fff !important;
+}

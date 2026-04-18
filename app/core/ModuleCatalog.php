@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Core;
 
 use PDO;
-use Throwable;
 
 class ModuleCatalog
 {
@@ -28,8 +27,8 @@ class ModuleCatalog
             'roles' => ['title' => 'Roles', 'description' => 'Administración de roles del sistema.', 'table' => 'roles', 'route' => 'roles'],
             'usuarios' => ['title' => 'Usuarios', 'description' => 'Administración de usuarios del sistema.', 'table' => 'usuarios', 'route' => 'usuarios'],
             'configuracion' => ['title' => 'Configuración general', 'description' => 'Parámetros globales de la organización.', 'table' => 'configuracion', 'route' => 'configuracion'],
-            'auditoria' => ['title' => 'Auditoría', 'description' => 'Trazabilidad de acciones del sistema.', 'table' => 'auditoria', 'route' => 'auditoria'],
-            'reportes' => ['title' => 'Reportes', 'description' => 'Vista consolidada de datos para reportería.', 'table' => 'cuotas', 'route' => 'reportes'],
+            'auditoria' => ['title' => 'Auditoría', 'description' => 'Trazabilidad de acciones del sistema.', 'table' => 'auditoria', 'route' => 'auditoria', 'read_only' => true],
+            'reportes' => ['title' => 'Reportes', 'description' => 'Vista consolidada de datos para reportería.', 'table' => 'cuotas', 'route' => 'reportes', 'read_only' => true],
         ];
 
         return $modules[$key] ?? null;
@@ -38,16 +37,31 @@ class ModuleCatalog
     public static function resolveColumns(PDO $db, string $table): array
     {
         $stmt = $db->query('DESCRIBE `' . $table . '`');
-        $all = array_map(static fn(array $row) => (string) $row['Field'], $stmt->fetchAll());
+        $meta = $stmt->fetchAll();
 
-        $excluded = ['deleted_at', 'password'];
+        $all = array_map(static fn(array $row) => (string) $row['Field'], $meta);
+        $primaryKey = 'id';
+
+        foreach ($meta as $row) {
+            if (($row['Key'] ?? '') === 'PRI') {
+                $primaryKey = (string) $row['Field'];
+                break;
+            }
+        }
+
+        $excluded = ['password'];
         $columns = array_values(array_filter($all, static fn(string $column) => !in_array($column, $excluded, true)));
+
+        $formExcluded = [$primaryKey, 'created_at', 'updated_at', 'deleted_at'];
+        $form = array_values(array_filter($columns, static fn(string $column) => !in_array($column, $formExcluded, true)));
 
         return [
             'all' => $columns,
-            'visible' => array_slice($columns, 0, 8),
-            'searchable' => array_slice(array_values(array_filter($columns, static fn(string $column) => str_contains($column, 'nombre') || str_contains($column, 'numero') || str_contains($column, 'descripcion') || str_contains($column, 'correo') || str_contains($column, 'rut'))), 0, 3),
-            'form' => array_slice(array_values(array_filter($columns, static fn(string $column) => !in_array($column, ['id', 'created_at', 'updated_at', 'deleted_at'], true))), 0, 6),
+            'visible' => array_slice($columns, 0, 9),
+            'searchable' => array_slice(array_values(array_filter($columns, static fn(string $column) => str_contains($column, 'nombre') || str_contains($column, 'numero') || str_contains($column, 'descripcion') || str_contains($column, 'correo') || str_contains($column, 'rut'))), 0, 4),
+            'form' => array_slice($form, 0, 10),
+            'primary' => $primaryKey,
+            'has_deleted_at' => in_array('deleted_at', $columns, true),
         ];
     }
 
@@ -78,8 +92,12 @@ class ModuleCatalog
         $columnsMeta = self::resolveColumns($db, $config['table']);
         $searchColumns = $columnsMeta['searchable'];
 
-        $whereSql = '';
+        $conditions = [];
         $params = [];
+
+        if ($columnsMeta['has_deleted_at']) {
+            $conditions[] = '`deleted_at` IS NULL';
+        }
 
         if ($query !== '' && !empty($searchColumns)) {
             $parts = [];
@@ -88,8 +106,10 @@ class ModuleCatalog
                 $parts[] = "`{$column}` LIKE {$param}";
                 $params[$param] = '%' . $query . '%';
             }
-            $whereSql = ' WHERE ' . implode(' OR ', $parts);
+            $conditions[] = '(' . implode(' OR ', $parts) . ')';
         }
+
+        $whereSql = empty($conditions) ? '' : ' WHERE ' . implode(' AND ', $conditions);
 
         $countStmt = $db->prepare('SELECT COUNT(*) FROM `' . $config['table'] . '`' . $whereSql);
         foreach ($params as $k => $v) {
@@ -99,7 +119,7 @@ class ModuleCatalog
         $total = (int) $countStmt->fetchColumn();
 
         $offset = max(0, ($page - 1) * $perPage);
-        $sql = 'SELECT * FROM `' . $config['table'] . '`' . $whereSql . ' ORDER BY 1 DESC LIMIT :limit OFFSET :offset';
+        $sql = 'SELECT * FROM `' . $config['table'] . '`' . $whereSql . ' ORDER BY `' . $columnsMeta['primary'] . '` DESC LIMIT :limit OFFSET :offset';
         $stmt = $db->prepare($sql);
         foreach ($params as $k => $v) {
             $stmt->bindValue($k, $v);
@@ -112,11 +132,75 @@ class ModuleCatalog
             'rows' => $stmt->fetchAll(),
             'total' => $total,
             'columns' => $columnsMeta,
-            'searchable' => $searchColumns,
             'query' => $query,
             'page' => $page,
-            'perPage' => $perPage,
             'pages' => max(1, (int) ceil($total / $perPage)),
         ];
+    }
+
+    public static function findById(string $table, string $primaryKey, int $id): ?array
+    {
+        $stmt = Database::connection()->prepare('SELECT * FROM `' . $table . '` WHERE `' . $primaryKey . '` = :id LIMIT 1');
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
+        $row = $stmt->fetch();
+
+        return $row ?: null;
+    }
+
+    public static function save(string $table, string $primaryKey, array $fields, array $payload, ?int $id = null): void
+    {
+        $data = [];
+        foreach ($fields as $field) {
+            $data[$field] = trim((string) ($payload[$field] ?? ''));
+            if ($data[$field] === '') {
+                $data[$field] = null;
+            }
+        }
+
+        $db = Database::connection();
+
+        if ($id !== null) {
+            $sets = [];
+            foreach ($fields as $field) {
+                $sets[] = "`{$field}` = :{$field}";
+            }
+            $sql = 'UPDATE `' . $table . '` SET ' . implode(', ', $sets) . ' WHERE `' . $primaryKey . '` = :pk';
+            $stmt = $db->prepare($sql);
+            foreach ($data as $field => $value) {
+                $stmt->bindValue(':' . $field, $value);
+            }
+            $stmt->bindValue(':pk', $id, PDO::PARAM_INT);
+            $stmt->execute();
+            return;
+        }
+
+        $insertData = array_filter($data, static fn($value) => $value !== null);
+
+        if (empty($insertData)) {
+            return;
+        }
+
+        $columns = array_keys($insertData);
+        $params = array_map(static fn(string $column) => ':' . $column, $columns);
+
+        $sql = 'INSERT INTO `' . $table . '` (`' . implode('`,`', $columns) . '`) VALUES (' . implode(',', $params) . ')';
+        $stmt = $db->prepare($sql);
+        foreach ($insertData as $field => $value) {
+            $stmt->bindValue(':' . $field, $value);
+        }
+        $stmt->execute();
+    }
+
+    public static function delete(string $table, string $primaryKey, int $id, bool $softDelete): void
+    {
+        if ($softDelete) {
+            $stmt = Database::connection()->prepare('UPDATE `' . $table . '` SET deleted_at = NOW() WHERE `' . $primaryKey . '` = :id');
+        } else {
+            $stmt = Database::connection()->prepare('DELETE FROM `' . $table . '` WHERE `' . $primaryKey . '` = :id');
+        }
+
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
     }
 }
