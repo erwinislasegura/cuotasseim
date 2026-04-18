@@ -79,10 +79,12 @@ abstract class Controller
             $viewId = isset($_GET['view']) ? (int) $_GET['view'] : null;
             $currentRecord = null;
             $viewRecord = null;
+            $viewRecordDisplay = null;
             $formMeta = [];
             $formFields = $data['columns']['form'];
             $columnLabels = [];
             $visibleColumns = $data['columns']['visible'];
+            $displayRows = ModuleCatalog::decorateRowsForDisplay($config['table'], $data['rows']);
 
             if ($editId !== null && $editId > 0) {
                 $currentRecord = ModuleCatalog::findById($config['table'], $primaryKey, $editId);
@@ -90,6 +92,7 @@ abstract class Controller
 
             if ($viewId !== null && $viewId > 0) {
                 $viewRecord = ModuleCatalog::findById($config['table'], $primaryKey, $viewId);
+                $viewRecordDisplay = ModuleCatalog::decorateRecordForDisplay($config['table'], $viewRecord);
             }
 
 
@@ -227,6 +230,7 @@ abstract class Controller
                 'from' => $from,
                 'to' => $to,
                 'rows' => $data['rows'],
+                'displayRows' => $displayRows,
                 'columns' => $visibleColumns,
                 'formFields' => $formFields,
                 'statusField' => $data['columns']['status_field'],
@@ -239,6 +243,7 @@ abstract class Controller
                 'primaryKey' => $primaryKey,
                 'currentRecord' => $currentRecord,
                 'viewRecord' => $viewRecord,
+                'viewRecordDisplay' => $viewRecordDisplay,
                 'isReadOnly' => $isReadOnly,
                 'flashSuccess' => $flashSuccess,
                 'flashError' => $flashError,
@@ -255,6 +260,7 @@ abstract class Controller
                 'from' => $from,
                 'to' => $to,
                 'rows' => [],
+                'displayRows' => [],
                 'columns' => [],
                 'formFields' => [],
                 'statusField' => null,
@@ -267,6 +273,7 @@ abstract class Controller
                 'primaryKey' => 'id',
                 'currentRecord' => null,
                 'viewRecord' => null,
+                'viewRecordDisplay' => null,
                 'isReadOnly' => true,
                 'error' => 'No fue posible cargar el módulo. Verifica la conexión y migraciones de base de datos.',
                 'formMeta' => [],
