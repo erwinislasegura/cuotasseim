@@ -10,7 +10,7 @@ class ConceptosCobroController extends Controller
 {
     public function index(): void
     {
-        echo 'ConceptosCobro: módulo en construcción con base MVC y DB preparada.';
+        $this->renderModule('conceptos_cobro');
     }
 
     public function crear(): void

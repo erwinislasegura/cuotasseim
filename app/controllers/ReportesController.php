@@ -10,7 +10,7 @@ class ReportesController extends Controller
 {
     public function index(): void
     {
-        echo 'Reportes: módulo en construcción con base MVC y DB preparada.';
+        $this->renderModule('reportes');
     }
 
     public function crear(): void
