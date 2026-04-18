@@ -196,14 +196,65 @@ body {
   z-index: 1080;
 }
 
+.table-actions-dropdown {
+  position: static;
+}
+
+.table-actions-dropdown .dropdown-menu {
+  min-width: 9.5rem;
+  border-radius: 0.6rem;
+  border: 1px solid #d6e1ec;
+  box-shadow: 0 10px 24px rgba(18, 44, 72, 0.16);
+}
+
 .modal-detail-header {
   background: linear-gradient(180deg, #f8fbff 0%, #f2f7fd 100%);
   border-bottom: 1px solid #dbe5f0;
 }
 
+.modal-detail-content {
+  border-radius: 0.82rem;
+  overflow: hidden;
+}
+
+.modal-detail-subtitle {
+  font-size: 0.74rem;
+  color: #6e8199;
+}
+
 .modal-detail-body {
   background: #f8fbff;
   padding: 0.85rem;
+}
+
+.record-detail-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.record-summary-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  border: 1px solid #d6e3ef;
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 0.28rem 0.56rem;
+}
+
+.record-summary-chip-label {
+  font-size: 0.66rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #6d7f95;
+  font-weight: 700;
+}
+
+.record-summary-chip-value {
+  font-size: 0.74rem;
+  color: #243e5c;
+  font-weight: 700;
 }
 
 .record-detail-item {
