@@ -187,6 +187,49 @@ body {
 }
 
 .table td, .table th { padding: 0.56rem 0.62rem; }
+.module-table-responsive {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.module-table-responsive .dropdown-menu {
+  z-index: 1080;
+}
+
+.modal-detail-header {
+  background: linear-gradient(180deg, #f8fbff 0%, #f2f7fd 100%);
+  border-bottom: 1px solid #dbe5f0;
+}
+
+.modal-detail-body {
+  background: #f8fbff;
+  padding: 0.85rem;
+}
+
+.record-detail-item {
+  border: 1px solid #dbe5f0;
+  border-radius: 0.62rem;
+  background: #ffffff;
+  padding: 0.58rem 0.65rem;
+  min-height: 74px;
+}
+
+.record-detail-label {
+  color: #6a7d94;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 0.68rem;
+  margin-bottom: 0.18rem;
+  font-weight: 700;
+}
+
+.record-detail-value {
+  font-size: 0.81rem;
+  color: #2a405a;
+  font-weight: 600;
+  line-height: 1.35;
+  word-break: break-word;
+}
 
 .kpi-card { position: relative; overflow: hidden; }
 .kpi-card .kpi-label { color: var(--ui-muted); font-size: 0.74rem; }

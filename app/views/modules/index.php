@@ -206,7 +206,7 @@ $statusOptions = [
     </form>
   </div>
   <div class="card-body p-0">
-    <div class="table-responsive">
+    <div class="table-responsive module-table-responsive">
       <table class="table table-sm table-striped table-hover mb-0 align-middle">
         <thead>
           <tr>
@@ -306,18 +306,16 @@ $statusOptions = [
 </div>
 
 <div class="modal fade" id="recordDetailModal" tabindex="-1" aria-labelledby="recordDetailModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
     <div class="modal-content">
-      <div class="modal-header">
-        <h2 class="modal-title fs-5" id="recordDetailModalLabel">Detalle del registro</h2>
+      <div class="modal-header modal-detail-header">
+        <h2 class="modal-title fs-6 fw-semibold" id="recordDetailModalLabel">
+          <i class="bi bi-card-list me-1"></i>Detalle del registro
+        </h2>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
-      <div class="modal-body">
-        <div class="table-responsive">
-          <table class="table table-sm table-striped mb-0">
-            <tbody id="recordDetailModalBody"></tbody>
-          </table>
-        </div>
+      <div class="modal-body modal-detail-body">
+        <div class="row g-2" id="recordDetailModalBody"></div>
       </div>
     </div>
   </div>
@@ -331,17 +329,26 @@ $statusOptions = [
       return;
     }
 
+    const escapeHtml = function (value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    };
+
     const renderRecordDetails = function (payload) {
       const details = Array.isArray(payload) ? payload : [];
       if (details.length === 0) {
-        detailBody.innerHTML = '<tr><td class="text-muted">No hay datos para mostrar.</td></tr>';
+        detailBody.innerHTML = '<div class="col-12"><div class="record-detail-item text-muted">No hay datos para mostrar.</div></div>';
         return;
       }
 
       detailBody.innerHTML = details.map(function (item) {
-        const label = item && item.label ? item.label : '';
-        const value = item && item.value ? item.value : '-';
-        return '<tr><th class="w-25">' + label + '</th><td>' + value + '</td></tr>';
+        const label = escapeHtml(item && item.label ? item.label : '');
+        const value = escapeHtml(item && item.value ? item.value : '-');
+        return '<div class="col-12 col-md-6 col-xl-4"><article class="record-detail-item"><div class="record-detail-label">' + label + '</div><div class="record-detail-value">' + value + '</div></article></div>';
       }).join('');
     };
 
