@@ -10,7 +10,7 @@ class TesoreriaController extends Controller
 {
     public function index(): void
     {
-        echo 'Tesoreria: módulo en construcción con base MVC y DB preparada.';
+        $this->renderModule('tesoreria');
     }
 
     public function crear(): void

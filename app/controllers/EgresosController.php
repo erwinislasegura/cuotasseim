@@ -10,7 +10,7 @@ class EgresosController extends Controller
 {
     public function index(): void
     {
-        echo 'Egresos: módulo en construcción con base MVC y DB preparada.';
+        $this->renderModule('egresos');
     }
 
     public function crear(): void

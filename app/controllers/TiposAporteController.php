@@ -10,7 +10,7 @@ class TiposAporteController extends Controller
 {
     public function index(): void
     {
-        echo 'TiposAporte: módulo en construcción con base MVC y DB preparada.';
+        $this->renderModule('tipos_aporte');
     }
 
     public function crear(): void

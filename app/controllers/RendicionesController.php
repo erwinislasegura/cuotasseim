@@ -10,7 +10,7 @@ class RendicionesController extends Controller
 {
     public function index(): void
     {
-        echo 'Rendiciones: módulo en construcción con base MVC y DB preparada.';
+        $this->renderModule('rendiciones');
     }
 
     public function crear(): void

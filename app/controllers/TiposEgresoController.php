@@ -10,7 +10,7 @@ class TiposEgresoController extends Controller
 {
     public function index(): void
     {
-        echo 'TiposEgreso: módulo en construcción con base MVC y DB preparada.';
+        $this->renderModule('tipos_egreso');
     }
 
     public function crear(): void

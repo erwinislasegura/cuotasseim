@@ -10,7 +10,7 @@ class MediosPagoController extends Controller
 {
     public function index(): void
     {
-        echo 'MediosPago: módulo en construcción con base MVC y DB preparada.';
+        $this->renderModule('medios_pago');
     }
 
     public function crear(): void

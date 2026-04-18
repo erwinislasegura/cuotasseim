@@ -10,7 +10,7 @@ class UsuariosController extends Controller
 {
     public function index(): void
     {
-        echo 'Usuarios: módulo en construcción con base MVC y DB preparada.';
+        $this->renderModule('usuarios');
     }
 
     public function crear(): void

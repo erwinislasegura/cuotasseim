@@ -10,7 +10,7 @@ class PagosController extends Controller
 {
     public function index(): void
     {
-        echo 'Pagos: módulo en construcción con base MVC y DB preparada.';
+        $this->renderModule('pagos');
     }
 
     public function crear(): void
