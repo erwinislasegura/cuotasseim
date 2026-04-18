@@ -86,9 +86,24 @@ $statusOptions = [
 
       <?php foreach (($formFields ?? []) as $field): ?>
         <?php $value = (string) (($currentRecord[$field] ?? '') ?: ''); ?>
+        <?php $fieldType = (string) (($formMeta['types'][$field] ?? 'text')); ?>
+        <?php $isReadOnlyField = (bool) (($formMeta['readonly'][$field] ?? false) || ($isReadOnly ?? false)); ?>
+        <?php $fieldOptions = $formMeta['options'][$field] ?? null; ?>
+        <?php $fieldLabel = (string) (($formMeta['labels'][$field] ?? ucwords(str_replace('_', ' ', (string) $field)))); ?>
         <div class="col-md-4 col-lg-3">
-          <label class="form-label"><?= htmlspecialchars(ucwords(str_replace('_', ' ', (string) $field))) ?></label>
-          <input type="text" name="<?= htmlspecialchars((string) $field) ?>" value="<?= htmlspecialchars($value) ?>" class="form-control form-control-sm" <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>
+          <label class="form-label"><?= htmlspecialchars($fieldLabel) ?></label>
+          <?php if (is_array($fieldOptions)): ?>
+            <select name="<?= htmlspecialchars((string) $field) ?>" class="form-select form-select-sm" <?= $isReadOnlyField ? 'disabled' : '' ?>>
+              <option value="">Seleccionar...</option>
+              <?php foreach ($fieldOptions as $option): ?>
+                <option value="<?= htmlspecialchars((string) ($option['value'] ?? '')) ?>" <?= $value === (string) ($option['value'] ?? '') ? 'selected' : '' ?>>
+                  <?= htmlspecialchars((string) ($option['label'] ?? '')) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          <?php else: ?>
+            <input type="<?= htmlspecialchars($fieldType) ?>" name="<?= htmlspecialchars((string) $field) ?>" value="<?= htmlspecialchars($value) ?>" class="form-control form-control-sm" <?= $isReadOnlyField ? 'readonly' : '' ?> <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>
+          <?php endif; ?>
         </div>
       <?php endforeach; ?>
 
@@ -100,6 +115,29 @@ $statusOptions = [
     </form>
   </div>
 </div>
+
+<?php if (($route ?? '') === 'socios'): ?>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const nombres = document.querySelector('input[name="nombres"]');
+      const apellidos = document.querySelector('input[name="apellidos"]');
+      const nombreCompleto = document.querySelector('input[name="nombre_completo"]');
+
+      if (!nombres || !apellidos || !nombreCompleto) {
+        return;
+      }
+
+      const actualizarNombreCompleto = function () {
+        const fullName = [nombres.value.trim(), apellidos.value.trim()].filter(Boolean).join(' ');
+        nombreCompleto.value = fullName;
+      };
+
+      nombres.addEventListener('input', actualizarNombreCompleto);
+      apellidos.addEventListener('input', actualizarNombreCompleto);
+      actualizarNombreCompleto();
+    });
+  </script>
+<?php endif; ?>
 
 <?php if (!empty($viewRecord)): ?>
   <div class="card mb-3">
@@ -152,7 +190,8 @@ $statusOptions = [
           <tr>
             <th>#</th>
             <?php foreach (($columns ?? []) as $column): ?>
-              <th><?= htmlspecialchars(ucwords(str_replace('_', ' ', (string) $column))) ?></th>
+              <?php $columnLabel = (string) (($columnLabels[$column] ?? ucwords(str_replace('_', ' ', (string) $column)))); ?>
+              <th><?= htmlspecialchars($columnLabel) ?></th>
             <?php endforeach; ?>
             <th class="text-end">Acciones</th>
           </tr>
