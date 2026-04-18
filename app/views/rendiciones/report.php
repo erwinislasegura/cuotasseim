@@ -9,12 +9,14 @@ $totalIngresos = (float) ($summary['total_ingresos'] ?? 0);
 $totalEgresos = (float) ($summary['total_egresos'] ?? 0);
 $balance = $totalIngresos - $totalEgresos;
 
-$maxType = max(1, ...array_map(static fn($value): float => (float) $value, $byType ?: [0]));
+$maxTypeValues = array_values(array_map(static fn($value): float => (float) $value, $byType ?: [0]));
+$maxType = max(1, ...$maxTypeValues);
 $originTotals = [];
 foreach ($byOrigin as $origin => $values) {
     $originTotals[$origin] = (float) (($values['ingreso'] ?? 0) + ($values['egreso'] ?? 0));
 }
-$maxOrigin = max(1, ...array_map(static fn($value): float => (float) $value, $originTotals ?: [0]));
+$maxOriginValues = array_values(array_map(static fn($value): float => (float) $value, $originTotals ?: [0]));
+$maxOrigin = max(1, ...$maxOriginValues);
 ?>
 
 <style>
