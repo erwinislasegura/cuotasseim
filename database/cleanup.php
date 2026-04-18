@@ -35,7 +35,8 @@ try {
     $pdo->beginTransaction();
     $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
     foreach ($tables as $table) {
-        $pdo->exec('TRUNCATE TABLE `' . $table . '`');
+        $pdo->exec('DELETE FROM `' . $table . '`');
+        $pdo->exec('ALTER TABLE `' . $table . '` AUTO_INCREMENT = 1');
     }
     $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
     $pdo->commit();
