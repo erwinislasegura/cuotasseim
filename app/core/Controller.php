@@ -82,6 +82,7 @@ abstract class Controller
             $formMeta = [];
             $formFields = $data['columns']['form'];
             $columnLabels = [];
+            $visibleColumns = $data['columns']['visible'];
 
             if ($editId !== null && $editId > 0) {
                 $currentRecord = ModuleCatalog::findById($config['table'], $primaryKey, $editId);
@@ -89,6 +90,43 @@ abstract class Controller
 
             if ($viewId !== null && $viewId > 0) {
                 $viewRecord = ModuleCatalog::findById($config['table'], $primaryKey, $viewId);
+            }
+
+
+            if ($config['table'] === 'periodos') {
+                $formFields = array_values(array_intersect([
+                    'nombre_periodo',
+                    'tipo_periodo',
+                    'monto_a_pagar',
+                ], $data['columns']['form']));
+
+                $formMeta = [
+                    'types' => [
+                        'monto_a_pagar' => 'number',
+                    ],
+                    'options' => [
+                        'tipo_periodo' => [
+                            ['value' => 'mensual', 'label' => 'Mensual'],
+                            ['value' => 'trimestral', 'label' => 'Trimestral'],
+                            ['value' => 'semestral', 'label' => 'Semestral'],
+                            ['value' => 'anual', 'label' => 'Anual'],
+                        ],
+                    ],
+                    'labels' => [
+                        'nombre_periodo' => 'Nombre del plan',
+                        'tipo_periodo' => 'Frecuencia',
+                        'monto_a_pagar' => 'Monto a pagar',
+                    ],
+                ];
+
+                $columnLabels = $formMeta['labels'];
+                $visibleColumns = array_values(array_intersect([
+                    'id',
+                    'nombre_periodo',
+                    'tipo_periodo',
+                    'monto_a_pagar',
+                    'created_at',
+                ], $data['columns']['all']));
             }
 
             if ($config['table'] === 'socios') {
@@ -166,7 +204,7 @@ abstract class Controller
                 'from' => $from,
                 'to' => $to,
                 'rows' => $data['rows'],
-                'columns' => $data['columns']['visible'],
+                'columns' => $visibleColumns,
                 'formFields' => $formFields,
                 'statusField' => $data['columns']['status_field'],
                 'statusCounts' => $data['summary']['status_counts'] ?? [],
