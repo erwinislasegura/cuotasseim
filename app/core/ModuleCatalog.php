@@ -337,6 +337,41 @@ class ModuleCatalog
             }
         }
 
+        if ($table === 'egresos') {
+            if (self::columnExists('egresos', 'fecha') && empty($data['fecha'])) {
+                $data['fecha'] = date('Y-m-d');
+                if (!in_array('fecha', $persistFields, true)) {
+                    $persistFields[] = 'fecha';
+                }
+            }
+
+            if (self::columnExists('egresos', 'numero_documento')) {
+                $numeroComprobante = trim((string) ($data['numero_documento'] ?? ''));
+                if ($numeroComprobante === '') {
+                    $numeroComprobante = self::nextEgresoDocumentNumber();
+                }
+                $data['numero_documento'] = $numeroComprobante;
+                if (!in_array('numero_documento', $persistFields, true)) {
+                    $persistFields[] = 'numero_documento';
+                }
+            }
+
+            if (self::columnExists('egresos', 'estado')) {
+                $data['estado'] = (string) ($data['estado'] ?? 'aplicado');
+                if (!in_array('estado', $persistFields, true)) {
+                    $persistFields[] = 'estado';
+                }
+            }
+
+            if (self::columnExists('egresos', 'usuario_id')) {
+                $usuario = Auth::user();
+                $data['usuario_id'] = (string) ((int) ($usuario['id'] ?? $_SESSION['user_id'] ?? 1));
+                if (!in_array('usuario_id', $persistFields, true)) {
+                    $persistFields[] = 'usuario_id';
+                }
+            }
+        }
+
         $db = Database::connection();
 
         if ($id !== null) {
@@ -465,6 +500,22 @@ class ModuleCatalog
         $next = ((int) $stmt->fetchColumn()) + 1;
 
         return str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+    }
+
+    public static function nextEgresoDocumentNumber(): string
+    {
+        $prefix = 'EGR-' . date('Ymd') . '-';
+        $stmt = Database::connection()->prepare('SELECT numero_documento FROM egresos WHERE numero_documento LIKE :prefix ORDER BY id DESC LIMIT 1');
+        $stmt->bindValue(':prefix', $prefix . '%');
+        $stmt->execute();
+        $lastNumber = (string) ($stmt->fetchColumn() ?: '');
+
+        $sequence = 1;
+        if ($lastNumber !== '' && preg_match('/(\d+)$/', $lastNumber, $matches) === 1) {
+            $sequence = ((int) $matches[1]) + 1;
+        }
+
+        return $prefix . str_pad((string) $sequence, 4, '0', STR_PAD_LEFT);
     }
 
     public static function delete(string $table, string $primaryKey, int $id, bool $softDelete): void
