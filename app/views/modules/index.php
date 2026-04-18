@@ -29,6 +29,13 @@ $exportQueryParams = array_merge([
   'to' => (string) ($to ?? ''),
   'export' => 'excel',
 ], $extraQueryParams);
+$reportQueryParams = array_merge([
+  'q' => (string) ($query ?? ''),
+  'status' => (string) ($status ?? ''),
+  'from' => (string) ($from ?? ''),
+  'to' => (string) ($to ?? ''),
+  'report' => 'print',
+], $extraQueryParams);
 ?>
 
 <section class="page-header d-flex justify-content-between align-items-start mb-3 gap-2 flex-wrap">
@@ -523,6 +530,16 @@ $exportQueryParams = array_merge([
 <div class="card">
   <div class="card-header py-2 d-flex justify-content-between align-items-center gap-2 flex-wrap">
     <strong class="card-title mb-0"><?= $isPaymentHistory ? 'Historial de pagos' : 'Listado de registros' ?></strong>
+    <?php if (($route ?? '') === 'rendiciones'): ?>
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary btn-sm" href="<?= htmlspecialchars(url(($route ?? '') . '?' . http_build_query($exportQueryParams))) ?>">
+          <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
+        </a>
+        <a class="btn btn-outline-dark btn-sm" target="_blank" href="<?= htmlspecialchars(url(($route ?? '') . '?' . http_build_query($reportQueryParams))) ?>">
+          <i class="bi bi-printer me-1"></i>Imprimir informe
+        </a>
+      </div>
+    <?php endif; ?>
     <form method="get" action="<?= htmlspecialchars(url($route ?? '')) ?>" class="row gx-2 gy-2 align-items-end">
       <div class="col-sm-auto">
         <label class="form-label">Buscar</label>
