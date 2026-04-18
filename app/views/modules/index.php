@@ -431,6 +431,20 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
                       ];
                     }
                     $recordDetailsJson = htmlspecialchars((string) json_encode($recordDetails, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_TAG), ENT_QUOTES, 'UTF-8');
+                    $egresoPrintPayload = [];
+                    if (($route ?? '') === 'egresos') {
+                      $egresoPrintPayload = [
+                        'numero_comprobante' => (string) ($row['numero_documento'] ?? ''),
+                        'fecha' => (string) ($row['fecha'] ?? ''),
+                        'tipo_egreso' => (string) ($displayRow['tipo_egreso_id'] ?? $row['tipo_egreso_id'] ?? ''),
+                        'destinatario' => (string) ($row['proveedor_destinatario'] ?? ''),
+                        'descripcion' => (string) ($row['descripcion'] ?? ''),
+                        'monto' => (string) ($row['monto'] ?? ''),
+                        'cuenta' => (string) ($displayRow['cuenta_bancaria_id'] ?? $row['cuenta_bancaria_id'] ?? ''),
+                        'observacion' => (string) ($row['observacion'] ?? ''),
+                      ];
+                    }
+                    $egresoPrintPayloadJson = htmlspecialchars((string) json_encode($egresoPrintPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_TAG), ENT_QUOTES, 'UTF-8');
                   ?>
                   <div class="dropdown table-actions-dropdown">
                     <button class="btn btn-light btn-sm dropdown-toggle table-actions-dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -448,6 +462,16 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
                         </button>
                       </li>
                       <?php if (!$isPaymentHistory): ?>
+                        <?php if (($route ?? '') === 'egresos'): ?>
+                          <li>
+                            <button
+                              type="button"
+                              class="dropdown-item js-print-egreso"
+                              data-egreso='<?= $egresoPrintPayloadJson ?>'>
+                              Imprimir comprobante
+                            </button>
+                          </li>
+                        <?php endif; ?>
                         <li>
                           <a href="<?= htmlspecialchars(url(($route ?? '') . '?edit=' . (int) ($row[$primaryKey] ?? 0))) ?>" class="dropdown-item <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>">Editar</a>
                         </li>
@@ -610,6 +634,65 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
         } catch (error) {
           renderRecordDetails([]);
         }
+      });
+    });
+
+    const formatCurrency = function (rawAmount) {
+      const amount = Number(rawAmount || 0);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return '-';
+      }
+      return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(amount);
+    };
+
+    const printEgresoVoucher = function (payload) {
+      const comprobante = payload && payload.numero_comprobante ? payload.numero_comprobante : '-';
+      const fecha = payload && payload.fecha ? payload.fecha : '-';
+      const tipoEgreso = payload && payload.tipo_egreso ? payload.tipo_egreso : '-';
+      const destinatario = payload && payload.destinatario ? payload.destinatario : '-';
+      const descripcion = payload && payload.descripcion ? payload.descripcion : '-';
+      const monto = formatCurrency(payload && payload.monto ? payload.monto : 0);
+      const cuenta = payload && payload.cuenta ? payload.cuenta : '-';
+      const observacion = payload && payload.observacion ? payload.observacion : '-';
+      const fechaImpresion = new Date().toLocaleString('es-CL');
+      const organization = <?= json_encode((string) ($_SESSION['app_name'] ?? 'Sistema de Gestión de Cuotas'), JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_TAG) ?>;
+
+      const html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Comprobante egreso ' + escapeHtml(comprobante) + '</title>' +
+        '<style>body{font-family:Arial,sans-serif;color:#203040;margin:24px;}h1{font-size:18px;margin:0 0 6px;}small{color:#5a6d82;}table{width:100%;border-collapse:collapse;margin-top:16px;}th,td{border:1px solid #d7e1eb;padding:8px;text-align:left;font-size:13px;}th{background:#f3f8fd;width:34%;}.header{border-bottom:2px solid #1d4c7d;padding-bottom:8px;margin-bottom:10px;}.amount{font-size:20px;font-weight:700;color:#163a5f;text-align:right;margin-top:12px;}.footer{margin-top:24px;font-size:12px;color:#607487;display:flex;justify-content:space-between;}.sign{margin-top:36px;border-top:1px solid #9eb2c7;padding-top:8px;width:240px;}</style>' +
+        '</head><body><div class="header"><h1>Comprobante de Egreso</h1><small>' + escapeHtml(organization) + '</small></div>' +
+        '<table><tr><th>N° comprobante</th><td>' + escapeHtml(comprobante) + '</td></tr>' +
+        '<tr><th>Fecha</th><td>' + escapeHtml(fecha) + '</td></tr>' +
+        '<tr><th>Tipo de egreso</th><td>' + escapeHtml(tipoEgreso) + '</td></tr>' +
+        '<tr><th>Retirado por / destinatario</th><td>' + escapeHtml(destinatario) + '</td></tr>' +
+        '<tr><th>Descripción</th><td>' + escapeHtml(descripcion) + '</td></tr>' +
+        '<tr><th>Cuenta de salida</th><td>' + escapeHtml(cuenta) + '</td></tr>' +
+        '<tr><th>Observación</th><td>' + escapeHtml(observacion) + '</td></tr></table>' +
+        '<div class="amount">Monto: ' + escapeHtml(monto) + '</div>' +
+        '<div class="footer"><span>Impreso: ' + escapeHtml(fechaImpresion) + '</span><span>Documento generado por el sistema.</span></div>' +
+        '<div class="sign">Firma responsable</div></body></html>';
+
+      const printWindow = window.open('', '_blank', 'width=900,height=700');
+      if (!printWindow) {
+        return;
+      }
+
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+    };
+
+    document.querySelectorAll('.js-print-egreso').forEach(function (button) {
+      button.addEventListener('click', function () {
+        const rawPayload = button.getAttribute('data-egreso');
+        let payload = {};
+        try {
+          payload = JSON.parse(rawPayload || '{}');
+        } catch (error) {
+          payload = {};
+        }
+        printEgresoVoucher(payload);
       });
     });
 

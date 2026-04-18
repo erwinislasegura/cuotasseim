@@ -310,10 +310,13 @@ abstract class Controller
                         'tipo_egreso_id' => 'Tipo de retiro',
                         'proveedor_destinatario' => 'Retirado por / destinatario',
                         'descripcion' => 'Motivo del retiro',
-                        'numero_documento' => 'N° documento / comprobante',
+                        'numero_documento' => 'N° comprobante',
                         'monto' => 'Monto retirado',
                         'cuenta_bancaria_id' => 'Cuenta de salida',
                         'observacion' => 'Observación adicional',
+                    ],
+                    'readonly' => [
+                        'numero_documento' => true,
                     ],
                     'required' => [
                         'fecha' => true,
@@ -326,7 +329,6 @@ abstract class Controller
                         'fecha' => ['max' => date('Y-m-d')],
                         'proveedor_destinatario' => ['placeholder' => 'Ej: Juan Pérez / Caja chica'],
                         'descripcion' => ['placeholder' => 'Detalle breve del motivo del retiro'],
-                        'numero_documento' => ['placeholder' => 'Ej: COMP-2026-00125'],
                         'monto' => ['step' => '0.01', 'min' => '0.01', 'placeholder' => '0.00'],
                         'observacion' => ['placeholder' => 'Información extra (opcional)'],
                     ],
@@ -358,6 +360,15 @@ abstract class Controller
                             'label' => $label,
                         ];
                     }, $cuentasStmt->fetchAll());
+                }
+
+                if ($currentRecord === null) {
+                    $currentRecord = [
+                        'fecha' => date('Y-m-d'),
+                        'numero_documento' => ModuleCatalog::nextEgresoDocumentNumber(),
+                    ];
+                } elseif (empty($currentRecord['numero_documento'])) {
+                    $currentRecord['numero_documento'] = ModuleCatalog::nextEgresoDocumentNumber();
                 }
             }
 
