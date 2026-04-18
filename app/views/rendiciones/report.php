@@ -31,50 +31,54 @@ $maxOrigin = max(1, ...$maxOriginValues);
     --corp-negative: #b91c1c;
   }
   body { font-family: "Segoe UI", Roboto, Arial, sans-serif; color: var(--corp-ink); background: #fff; }
-  .report-wrap { max-width: 1120px; margin: 0 auto; padding: 1.25rem; }
+  .report-wrap { max-width: 1040px; margin: 0 auto; padding: .75rem; }
   .report-header {
-    display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; margin-bottom:1rem;
-    padding: 1rem 1.1rem; border:1px solid var(--corp-border); border-radius:.75rem;
+    display:flex; justify-content:space-between; align-items:flex-start; gap:.75rem; margin-bottom:.7rem;
+    padding: .65rem .8rem; border:1px solid var(--corp-border); border-radius:.6rem;
     background: linear-gradient(135deg, #ffffff 0%, var(--corp-soft) 100%);
   }
-  .report-title { margin: 0; font-size: 1.35rem; font-weight: 700; color: var(--corp-primary); letter-spacing: .2px; }
-  .report-subtitle { font-size: .82rem; color: var(--corp-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: .7px; }
-  .report-meta { font-size: .86rem; color: var(--corp-muted); }
-  .kpi-grid { display:grid; grid-template-columns: repeat(4,minmax(160px,1fr)); gap:.75rem; margin-bottom:1rem; }
+  .report-title { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--corp-primary); letter-spacing: .15px; }
+  .report-subtitle { font-size: .72rem; color: var(--corp-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: .65px; }
+  .report-meta { font-size: .78rem; color: var(--corp-muted); line-height: 1.25; }
+  .kpi-grid { display:grid; grid-template-columns: repeat(4,minmax(130px,1fr)); gap:.5rem; margin-bottom:.7rem; }
   .kpi {
-    border:1px solid var(--corp-border); border-radius:.65rem; padding:.85rem .9rem; background:#fff;
+    border:1px solid var(--corp-border); border-radius:.5rem; padding:.55rem .65rem; background:#fff;
     box-shadow: 0 1px 2px rgba(15, 58, 104, .06);
   }
-  .kpi .label { font-size:.75rem; color:var(--corp-muted); text-transform:uppercase; letter-spacing:.55px; }
-  .kpi .value { font-size:1.18rem; font-weight:700; color: var(--corp-primary); }
-  .chart-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem; }
+  .kpi .label { font-size:.68rem; color:var(--corp-muted); text-transform:uppercase; letter-spacing:.45px; }
+  .kpi .value { font-size:1rem; font-weight:700; color: var(--corp-primary); line-height: 1.1; }
+  .chart-grid { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; margin-bottom:.7rem; }
   .chart-card {
-    border:1px solid var(--corp-border); border-radius:.75rem; padding:.85rem; background:#fff;
+    border:1px solid var(--corp-border); border-radius:.55rem; padding:.6rem; background:#fff;
     box-shadow: 0 1px 2px rgba(15, 58, 104, .05);
   }
-  .chart-title { font-weight:700; margin-bottom:.55rem; color: var(--corp-primary); }
-  .mini-bars { display:grid; gap:.35rem; }
-  .bar-row { display:grid; grid-template-columns:140px 1fr 110px; align-items:center; gap:.5rem; font-size:.85rem; }
-  .bar-track { background:#e8eef5; border-radius:999px; height:10px; overflow:hidden; }
+  .chart-title { font-size: .85rem; font-weight:700; margin-bottom:.4rem; color: var(--corp-primary); }
+  .mini-bars { display:grid; gap:.22rem; }
+  .bar-row { display:grid; grid-template-columns:110px 1fr 90px; align-items:center; gap:.35rem; font-size:.76rem; }
+  .bar-track { background:#e8eef5; border-radius:999px; height:7px; overflow:hidden; }
   .bar-fill { height:100%; background:var(--corp-secondary); border-radius:999px; }
   .bar-fill.egreso { background:var(--corp-negative); }
   .bar-fill.origin { background:#0f766e; }
-  .month-table th, .month-table td { font-size:.82rem; }
-  .report-card { border:1px solid var(--corp-border); border-radius:.75rem; overflow:hidden; box-shadow: 0 1px 2px rgba(15, 58, 104, .05); }
+  .month-table th, .month-table td { font-size:.75rem; padding: .35rem .45rem; }
+  .report-card { border:1px solid var(--corp-border); border-radius:.55rem; overflow:hidden; box-shadow: 0 1px 2px rgba(15, 58, 104, .05); }
   .report-card .card-header { background: var(--corp-soft); border-bottom:1px solid var(--corp-border); color: var(--corp-primary); }
-  .table thead th { background: #f8fbff; color: #1e3a5f; font-weight: 700; border-bottom-color: #dbe5f0; }
+  .table thead th { background: #f8fbff; color: #1e3a5f; font-weight: 700; border-bottom-color: #dbe5f0; font-size: .74rem; padding: .4rem .5rem; }
+  .table tbody td { padding: .36rem .5rem; font-size: .75rem; }
   @media print {
+    @page { size: A4 portrait; margin: 8mm; }
     .no-print { display:none !important; }
     body { background:#fff; }
     .report-wrap { padding:0; max-width: 100%; }
     .report-header, .kpi, .chart-card, .report-card { box-shadow: none; }
+    .kpi-grid, .chart-grid { break-inside: avoid; page-break-inside: avoid; }
+    .report-card { break-inside: auto; page-break-inside: auto; }
   }
 </style>
 
 <div class="report-wrap">
   <div class="report-header">
     <div>
-      <div class="report-subtitle">Gerencia administrativa · informe ejecutivo</div>
+      <div class="report-subtitle">Gerencia administrativa · formato de impresión</div>
       <h2 class="report-title">Informe corporativo de rendiciones</h2>
       <div class="report-meta">
         Fecha emisión: <?= htmlspecialchars(date('d-m-Y H:i')) ?> ·
