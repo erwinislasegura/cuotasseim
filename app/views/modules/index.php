@@ -16,6 +16,8 @@ $statusOptions = [
   'abierta' => 'Abierta',
   'exenta' => 'Exenta',
 ];
+
+$isPaymentHistory = ($route ?? '') === 'pagos';
 ?>
 
 <section class="page-header d-flex justify-content-between align-items-start mb-3 gap-2 flex-wrap">
@@ -30,7 +32,9 @@ $statusOptions = [
     </nav>
   </div>
   <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(url($route ?? '')) ?>"><i class="bi bi-plus-circle me-1"></i>Nuevo</a>
+    <?php if (!$isPaymentHistory): ?>
+      <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(url($route ?? '')) ?>"><i class="bi bi-plus-circle me-1"></i>Nuevo</a>
+    <?php endif; ?>
     <a class="btn btn-primary btn-sm" href="<?= htmlspecialchars(url(($route ?? '') . '?q=' . urlencode((string) ($query ?? '')) . '&status=' . urlencode((string) ($status ?? '')) . '&from=' . urlencode((string) ($from ?? '')) . '&to=' . urlencode((string) ($to ?? '')) . '&export=excel')) ?>"><i class="bi bi-download me-1"></i>Excel</a>
   </div>
 </section>
@@ -74,82 +78,84 @@ $statusOptions = [
   <div class="alert alert-danger small mb-3"><?= htmlspecialchars($error) ?></div>
 <?php endif; ?>
 
-<div class="card mb-3">
-  <div class="card-header py-2"><strong class="card-title mb-0"><?= !empty($currentRecord) ? 'Editar registro' : 'Crear registro' ?></strong></div>
-  <div class="card-body py-3">
-    <form class="row g-2" method="post" action="<?= htmlspecialchars(url($route ?? '')) ?>">
-      <input type="hidden" name="_token" value="<?= htmlspecialchars($token ?? '') ?>">
-      <input type="hidden" name="_action" value="save">
-      <?php if (!empty($currentRecord)): ?>
-        <input type="hidden" name="id" value="<?= (int) ($currentRecord[$primaryKey] ?? 0) ?>">
-      <?php endif; ?>
+<?php if (!$isPaymentHistory): ?>
+  <div class="card mb-3">
+    <div class="card-header py-2"><strong class="card-title mb-0"><?= !empty($currentRecord) ? 'Editar registro' : 'Crear registro' ?></strong></div>
+    <div class="card-body py-3">
+      <form class="row g-2" method="post" action="<?= htmlspecialchars(url($route ?? '')) ?>">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars($token ?? '') ?>">
+        <input type="hidden" name="_action" value="save">
+        <?php if (!empty($currentRecord)): ?>
+          <input type="hidden" name="id" value="<?= (int) ($currentRecord[$primaryKey] ?? 0) ?>">
+        <?php endif; ?>
 
-      <?php foreach (($formFields ?? []) as $field): ?>
-        <?php
-          $rawFieldValue = $currentRecord[$field] ?? '';
-          $value = is_array($rawFieldValue) ? '' : (string) ($rawFieldValue ?: '');
-        ?>
-        <?php $fieldType = (string) (($formMeta['types'][$field] ?? 'text')); ?>
-        <?php $isReadOnlyField = (bool) (($formMeta['readonly'][$field] ?? false) || ($isReadOnly ?? false)); ?>
-        <?php $fieldOptions = $formMeta['options'][$field] ?? null; ?>
-        <?php $isMultipleField = (bool) ($formMeta['multiple'][$field] ?? false); ?>
-        <?php $fieldLabel = (string) (($formMeta['labels'][$field] ?? ucwords(str_replace('_', ' ', (string) $field)))); ?>
-        <?php
-          $fieldClass = 'col-md-4 col-lg-3';
-          if (($route ?? '') === 'socios') {
-            if (in_array((string) $field, ['direccion', 'observaciones', 'planes_ids'], true)) {
-              $fieldClass = 'col-12';
-            } elseif (in_array((string) $field, ['nombres', 'apellidos', 'correo'], true)) {
-              $fieldClass = 'col-md-6 col-lg-4';
-            }
-          }
-        ?>
-        <div class="<?= htmlspecialchars($fieldClass) ?>">
-          <label class="form-label"><?= htmlspecialchars($fieldLabel) ?></label>
-          <?php if (is_array($fieldOptions)): ?>
-            <?php
-              $selectedValues = [];
-              if ($isMultipleField) {
-                $rawValues = $currentRecord[$field] ?? [];
-                if (!is_array($rawValues)) {
-                  $rawValues = $rawValues === null || $rawValues === '' ? [] : [(string) $rawValues];
-                }
-                $selectedValues = array_map(static fn($item): string => (string) $item, $rawValues);
+        <?php foreach (($formFields ?? []) as $field): ?>
+          <?php
+            $rawFieldValue = $currentRecord[$field] ?? '';
+            $value = is_array($rawFieldValue) ? '' : (string) ($rawFieldValue ?: '');
+          ?>
+          <?php $fieldType = (string) (($formMeta['types'][$field] ?? 'text')); ?>
+          <?php $isReadOnlyField = (bool) (($formMeta['readonly'][$field] ?? false) || ($isReadOnly ?? false)); ?>
+          <?php $fieldOptions = $formMeta['options'][$field] ?? null; ?>
+          <?php $isMultipleField = (bool) ($formMeta['multiple'][$field] ?? false); ?>
+          <?php $fieldLabel = (string) (($formMeta['labels'][$field] ?? ucwords(str_replace('_', ' ', (string) $field)))); ?>
+          <?php
+            $fieldClass = 'col-md-4 col-lg-3';
+            if (($route ?? '') === 'socios') {
+              if (in_array((string) $field, ['direccion', 'observaciones', 'planes_ids'], true)) {
+                $fieldClass = 'col-12';
+              } elseif (in_array((string) $field, ['nombres', 'apellidos', 'correo'], true)) {
+                $fieldClass = 'col-md-6 col-lg-4';
               }
-            ?>
-            <select name="<?= htmlspecialchars((string) $field) ?><?= $isMultipleField ? '[]' : '' ?>" class="form-select form-select-sm" <?= $isReadOnlyField ? 'disabled' : '' ?> <?= $isMultipleField ? 'multiple size=\"5\"' : '' ?>>
-              <?php if (!$isMultipleField): ?>
-                <option value="">Seleccionar...</option>
+            }
+          ?>
+          <div class="<?= htmlspecialchars($fieldClass) ?>">
+            <label class="form-label"><?= htmlspecialchars($fieldLabel) ?></label>
+            <?php if (is_array($fieldOptions)): ?>
+              <?php
+                $selectedValues = [];
+                if ($isMultipleField) {
+                  $rawValues = $currentRecord[$field] ?? [];
+                  if (!is_array($rawValues)) {
+                    $rawValues = $rawValues === null || $rawValues === '' ? [] : [(string) $rawValues];
+                  }
+                  $selectedValues = array_map(static fn($item): string => (string) $item, $rawValues);
+                }
+              ?>
+              <select name="<?= htmlspecialchars((string) $field) ?><?= $isMultipleField ? '[]' : '' ?>" class="form-select form-select-sm" <?= $isReadOnlyField ? 'disabled' : '' ?> <?= $isMultipleField ? 'multiple size=\"5\"' : '' ?>>
+                <?php if (!$isMultipleField): ?>
+                  <option value="">Seleccionar...</option>
+                <?php endif; ?>
+                <?php foreach ($fieldOptions as $option): ?>
+                  <?php
+                    $optionValue = (string) ($option['value'] ?? '');
+                    $isSelected = $isMultipleField
+                      ? in_array($optionValue, $selectedValues, true)
+                      : $value === $optionValue;
+                  ?>
+                  <option value="<?= htmlspecialchars($optionValue) ?>" <?= $isSelected ? 'selected' : '' ?>>
+                    <?= htmlspecialchars((string) ($option['label'] ?? '')) ?>
+                  </option>
+                <?php endforeach; ?>
+              </select>
+              <?php if ($isMultipleField): ?>
+                <small class="text-muted">Puedes seleccionar más de un plan (Ctrl/Cmd + clic).</small>
               <?php endif; ?>
-              <?php foreach ($fieldOptions as $option): ?>
-                <?php
-                  $optionValue = (string) ($option['value'] ?? '');
-                  $isSelected = $isMultipleField
-                    ? in_array($optionValue, $selectedValues, true)
-                    : $value === $optionValue;
-                ?>
-                <option value="<?= htmlspecialchars($optionValue) ?>" <?= $isSelected ? 'selected' : '' ?>>
-                  <?= htmlspecialchars((string) ($option['label'] ?? '')) ?>
-                </option>
-              <?php endforeach; ?>
-            </select>
-            <?php if ($isMultipleField): ?>
-              <small class="text-muted">Puedes seleccionar más de un plan (Ctrl/Cmd + clic).</small>
+            <?php else: ?>
+              <input type="<?= htmlspecialchars($fieldType) ?>" name="<?= htmlspecialchars((string) $field) ?>" value="<?= htmlspecialchars($value) ?>" class="form-control form-control-sm" <?= $isReadOnlyField ? 'readonly' : '' ?> <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>
             <?php endif; ?>
-          <?php else: ?>
-            <input type="<?= htmlspecialchars($fieldType) ?>" name="<?= htmlspecialchars((string) $field) ?>" value="<?= htmlspecialchars($value) ?>" class="form-control form-control-sm" <?= $isReadOnlyField ? 'readonly' : '' ?> <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>
-          <?php endif; ?>
-        </div>
-      <?php endforeach; ?>
+          </div>
+        <?php endforeach; ?>
 
-      <div class="col-12 mt-2 d-flex gap-2 flex-wrap">
-        <button type="submit" class="btn btn-primary btn-sm" <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>Guardar</button>
-        <button type="reset" class="btn btn-light btn-sm">Limpiar</button>
-        <a href="<?= htmlspecialchars(url($route ?? '')) ?>" class="btn btn-outline-secondary btn-sm">Cancelar</a>
-      </div>
-    </form>
+        <div class="col-12 mt-2 d-flex gap-2 flex-wrap">
+          <button type="submit" class="btn btn-primary btn-sm" <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>Guardar</button>
+          <button type="reset" class="btn btn-light btn-sm">Limpiar</button>
+          <a href="<?= htmlspecialchars(url($route ?? '')) ?>" class="btn btn-outline-secondary btn-sm">Cancelar</a>
+        </div>
+      </form>
+    </div>
   </div>
-</div>
+<?php endif; ?>
 
 <?php if (($route ?? '') === 'socios'): ?>
   <script>
@@ -176,7 +182,7 @@ $statusOptions = [
 
 <div class="card">
   <div class="card-header py-2 d-flex justify-content-between align-items-center gap-2 flex-wrap">
-    <strong class="card-title mb-0">Listado de registros</strong>
+    <strong class="card-title mb-0"><?= $isPaymentHistory ? 'Historial de pagos' : 'Listado de registros' ?></strong>
     <form method="get" action="<?= htmlspecialchars(url($route ?? '')) ?>" class="row gx-2 gy-2 align-items-end">
       <div class="col-sm-auto">
         <label class="form-label">Buscar</label>
@@ -270,18 +276,20 @@ $statusOptions = [
                           Ver detalle
                         </button>
                       </li>
-                      <li>
-                        <a href="<?= htmlspecialchars(url(($route ?? '') . '?edit=' . (int) ($row[$primaryKey] ?? 0))) ?>" class="dropdown-item <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>">Editar</a>
-                      </li>
-                      <li><hr class="dropdown-divider"></li>
-                      <li>
-                        <form method="post" action="<?= htmlspecialchars(url($route ?? '')) ?>" onsubmit="return confirm('¿Deseas eliminar este registro?');">
-                          <input type="hidden" name="_token" value="<?= htmlspecialchars($token ?? '') ?>">
-                          <input type="hidden" name="_action" value="delete">
-                          <input type="hidden" name="id" value="<?= (int) ($row[$primaryKey] ?? 0) ?>">
-                          <button type="submit" class="dropdown-item text-danger" <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>Eliminar</button>
-                        </form>
-                      </li>
+                      <?php if (!$isPaymentHistory): ?>
+                        <li>
+                          <a href="<?= htmlspecialchars(url(($route ?? '') . '?edit=' . (int) ($row[$primaryKey] ?? 0))) ?>" class="dropdown-item <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>">Editar</a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                          <form method="post" action="<?= htmlspecialchars(url($route ?? '')) ?>" onsubmit="return confirm('¿Deseas eliminar este registro?');">
+                            <input type="hidden" name="_token" value="<?= htmlspecialchars($token ?? '') ?>">
+                            <input type="hidden" name="_action" value="delete">
+                            <input type="hidden" name="id" value="<?= (int) ($row[$primaryKey] ?? 0) ?>">
+                            <button type="submit" class="dropdown-item text-danger" <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>Eliminar</button>
+                          </form>
+                        </li>
+                      <?php endif; ?>
                     </ul>
                   </div>
                 </td>

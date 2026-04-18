@@ -8,7 +8,7 @@ $menu = [
         ['route' => 'socios', 'label' => 'Socios', 'icon' => 'bi-people'],
         ['route' => 'periodos', 'label' => 'Planes', 'icon' => 'bi-calendar3'],
         ['route' => 'cuotas', 'label' => 'Registro de cuotas', 'icon' => 'bi-receipt'],
-        ['route' => 'pagos', 'label' => 'Pagos', 'icon' => 'bi-credit-card-2-front'],
+        ['route' => 'pagos', 'label' => 'Historial de pagos', 'icon' => 'bi-credit-card-2-front'],
         ['route' => 'aportes', 'label' => 'Aportes', 'icon' => 'bi-piggy-bank'],
         ['route' => 'egresos', 'label' => 'Egresos', 'icon' => 'bi-cash-stack'],
         ['route' => 'rendiciones', 'label' => 'Rendiciones', 'icon' => 'bi-journal-check'],

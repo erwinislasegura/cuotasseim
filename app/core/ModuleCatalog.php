@@ -22,7 +22,7 @@ class ModuleCatalog
             'conceptos_cobro' => ['title' => 'Conceptos de cobro', 'description' => 'Definición de conceptos recurrentes y extraordinarios.', 'table' => 'conceptos_cobro', 'route' => 'conceptos-cobro'],
             'cuotas' => ['title' => 'Registro de cuotas', 'description' => 'Selección de socio para revisar cuota por vencer y cuotas pendientes.', 'table' => 'cuotas', 'route' => 'cuotas'],
             'medios_pago' => ['title' => 'Medios de pago', 'description' => 'Catálogo de medios habilitados para recaudación.', 'table' => 'medios_pago', 'route' => 'medios-pago'],
-            'pagos' => ['title' => 'Pagos', 'description' => 'Registro, imputación y trazabilidad de pagos.', 'table' => 'pagos', 'route' => 'pagos'],
+            'pagos' => ['title' => 'Historial de pagos', 'description' => 'Consulta de pagos realizados con detalle completo por operación.', 'table' => 'pagos', 'route' => 'pagos'],
             'tipos_aporte' => ['title' => 'Tipos de aporte', 'description' => 'Clasificación de aportes extraordinarios.', 'table' => 'tipos_aporte', 'route' => 'tipos-aporte'],
             'aportes' => ['title' => 'Aportes', 'description' => 'Seguimiento de aportes extraordinarios por origen y estado.', 'table' => 'aportes', 'route' => 'aportes'],
             'tipos_egreso' => ['title' => 'Tipos de egreso', 'description' => 'Clasificación de egresos para tesorería y rendiciones.', 'table' => 'tipos_egreso', 'route' => 'tipos-egreso'],
