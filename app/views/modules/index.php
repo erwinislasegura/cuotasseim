@@ -206,7 +206,7 @@ $statusOptions = [
     </form>
   </div>
   <div class="card-body p-0">
-    <div class="table-responsive">
+    <div class="table-responsive module-table-responsive">
       <table class="table table-sm table-striped table-hover mb-0 align-middle">
         <thead>
           <tr>
@@ -255,8 +255,8 @@ $statusOptions = [
                     }
                     $recordDetailsJson = htmlspecialchars((string) json_encode($recordDetails, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_TAG), ENT_QUOTES, 'UTF-8');
                   ?>
-                  <div class="dropdown">
-                    <button class="btn btn-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                  <div class="dropdown table-actions-dropdown">
+                    <button class="btn btn-light btn-sm dropdown-toggle table-actions-dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                       Acciones
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
@@ -306,18 +306,23 @@ $statusOptions = [
 </div>
 
 <div class="modal fade" id="recordDetailModal" tabindex="-1" aria-labelledby="recordDetailModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 class="modal-title fs-5" id="recordDetailModalLabel">Detalle del registro</h2>
+  <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-content modal-detail-content border-0 shadow-sm">
+      <div class="modal-header modal-detail-header">
+        <div>
+          <h2 class="modal-title fs-6 fw-semibold mb-1" id="recordDetailModalLabel">
+            <i class="bi bi-card-list me-1"></i>Detalle del registro
+          </h2>
+          <p class="modal-detail-subtitle mb-0"><?= htmlspecialchars((string) ($title ?? 'Módulo')) ?></p>
+        </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
-      <div class="modal-body">
-        <div class="table-responsive">
-          <table class="table table-sm table-striped mb-0">
-            <tbody id="recordDetailModalBody"></tbody>
-          </table>
-        </div>
+      <div class="modal-body modal-detail-body">
+        <section id="recordDetailSummary" class="record-detail-summary mb-2"></section>
+        <div class="row g-2" id="recordDetailModalBody"></div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
       </div>
     </div>
   </div>
@@ -327,21 +332,77 @@ $statusOptions = [
   document.addEventListener('DOMContentLoaded', function () {
     const detailModal = document.getElementById('recordDetailModal');
     const detailBody = document.getElementById('recordDetailModalBody');
-    if (!detailModal || !detailBody) {
+    const detailSummary = document.getElementById('recordDetailSummary');
+    if (!detailModal || !detailBody || !detailSummary) {
       return;
     }
 
+    if (window.bootstrap) {
+      document.querySelectorAll('.table-actions-dropdown-toggle').forEach(function (toggle) {
+        new window.bootstrap.Dropdown(toggle, {
+          popperConfig: function (defaultConfig) {
+            const baseModifiers = Array.isArray(defaultConfig.modifiers) ? defaultConfig.modifiers : [];
+            return Object.assign({}, defaultConfig, {
+              strategy: 'fixed',
+              modifiers: baseModifiers.concat([
+                {
+                  name: 'preventOverflow',
+                  options: {
+                    boundary: document.body
+                  }
+                },
+                {
+                  name: 'flip',
+                  options: {
+                    fallbackPlacements: ['top-end', 'bottom-end']
+                  }
+                }
+              ])
+            });
+          }
+        });
+      });
+    }
+
+    const escapeHtml = function (value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    };
+
+    const renderRecordSummary = function (details) {
+      const summaryFields = details.filter(function (item) {
+        const label = String(item && item.label ? item.label : '').toLowerCase();
+        return ['id', 'numero', 'nombre', 'estado', 'fecha'].some(function (keyword) {
+          return label.indexOf(keyword) !== -1;
+        });
+      }).slice(0, 3);
+
+      if (summaryFields.length === 0) {
+        detailSummary.innerHTML = '';
+        return;
+      }
+
+      detailSummary.innerHTML = summaryFields.map(function (item) {
+        return '<div class="record-summary-chip"><span class="record-summary-chip-label">' + escapeHtml(item.label) + '</span><span class="record-summary-chip-value">' + escapeHtml(item.value || '-') + '</span></div>';
+      }).join('');
+    };
+
     const renderRecordDetails = function (payload) {
       const details = Array.isArray(payload) ? payload : [];
+      renderRecordSummary(details);
       if (details.length === 0) {
-        detailBody.innerHTML = '<tr><td class="text-muted">No hay datos para mostrar.</td></tr>';
+        detailBody.innerHTML = '<div class="col-12"><div class="record-detail-item text-muted">No hay datos para mostrar.</div></div>';
         return;
       }
 
       detailBody.innerHTML = details.map(function (item) {
-        const label = item && item.label ? item.label : '';
-        const value = item && item.value ? item.value : '-';
-        return '<tr><th class="w-25">' + label + '</th><td>' + value + '</td></tr>';
+        const label = escapeHtml(item && item.label ? item.label : '');
+        const value = escapeHtml(item && item.value ? item.value : '-');
+        return '<div class="col-12 col-md-6 col-xl-4"><article class="record-detail-item"><div class="record-detail-label">' + label + '</div><div class="record-detail-value">' + value + '</div></article></div>';
       }).join('');
     };
 
