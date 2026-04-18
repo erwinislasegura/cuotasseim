@@ -16,26 +16,47 @@
 <?php endif; ?>
 
 <div class="card mb-3">
-  <div class="card-header py-2"><strong class="card-title mb-0">Seleccionar socio</strong></div>
+  <div class="card-header py-2"><strong class="card-title mb-0">Buscar socio</strong></div>
   <div class="card-body py-3">
-    <form method="get" action="<?= htmlspecialchars(url('cuotas')) ?>" class="row g-2 align-items-end">
+    <form method="get" action="<?= htmlspecialchars(url('cuotas')) ?>" class="row g-2 align-items-end mb-3">
       <div class="col-md-8 col-lg-6">
-        <label for="socio_id" class="form-label">Socio</label>
-        <select name="socio_id" id="socio_id" class="form-select form-select-sm" required>
-          <option value="">Seleccione un socio...</option>
-          <?php foreach (($socios ?? []) as $item): ?>
-            <?php $label = trim((string) ($item['numero_socio'] ?? '') . ' · ' . (string) ($item['nombre_completo'] ?? '')); ?>
-            <option value="<?= (int) ($item['id'] ?? 0) ?>" <?= (int) ($selectedSocioId ?? 0) === (int) ($item['id'] ?? 0) ? 'selected' : '' ?>>
-              <?= htmlspecialchars($label) ?>
-            </option>
-          <?php endforeach; ?>
-        </select>
+        <label for="q" class="form-label">Nombre o RUT</label>
+        <input type="text" id="q" name="q" class="form-control form-control-sm" value="<?= htmlspecialchars((string) ($q ?? '')) ?>" placeholder="Ej: Juan Pérez o 12.345.678-9">
       </div>
       <div class="col-md-auto d-flex gap-2">
-        <button type="submit" class="btn btn-primary btn-sm">Ver registro</button>
+        <button type="submit" class="btn btn-primary btn-sm">Buscar</button>
         <a href="<?= htmlspecialchars(url('cuotas')) ?>" class="btn btn-light btn-sm">Limpiar</a>
       </div>
     </form>
+
+    <?php if (!empty($socios ?? [])): ?>
+      <div class="table-responsive">
+        <table class="table table-sm table-striped mb-0">
+          <thead>
+            <tr>
+              <th>N° socio</th>
+              <th>Nombre</th>
+              <th>RUT</th>
+              <th class="text-end">Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach (($socios ?? []) as $item): ?>
+              <tr>
+                <td><?= htmlspecialchars((string) ($item['numero_socio'] ?? '')) ?></td>
+                <td><?= htmlspecialchars((string) ($item['nombre_completo'] ?? '')) ?></td>
+                <td><?= htmlspecialchars((string) ($item['rut'] ?? '')) ?></td>
+                <td class="text-end">
+                  <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(url('cuotas') . '?q=' . urlencode((string) ($q ?? '')) . '&socio_id=' . (int) ($item['id'] ?? 0)) ?>">Seleccionar</a>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    <?php else: ?>
+      <p class="small text-muted mb-0">No hay socios para mostrar con la búsqueda actual.</p>
+    <?php endif; ?>
   </div>
 </div>
 
@@ -71,7 +92,7 @@
   </div>
 
   <div class="card mb-3">
-    <div class="card-header py-2"><strong class="card-title mb-0">Cuota por vencer</strong></div>
+    <div class="card-header py-2"><strong class="card-title mb-0">Cuota del periodo actual / por vencer</strong></div>
     <div class="card-body py-3">
       <?php if (!empty($cuotaPorVencer)): ?>
         <div class="table-responsive">
@@ -79,6 +100,7 @@
             <thead>
               <tr>
                 <th>Plan</th>
+                <th>Tipo de periodo</th>
                 <th>Concepto</th>
                 <th>Vencimiento</th>
                 <th>Estado</th>
@@ -90,6 +112,7 @@
             <tbody>
               <tr>
                 <td><?= htmlspecialchars((string) ($cuotaPorVencer['nombre_periodo'] ?? '-')) ?></td>
+                <td><?= htmlspecialchars(ucfirst((string) ($cuotaPorVencer['tipo_periodo'] ?? '-'))) ?></td>
                 <td><?= htmlspecialchars((string) ($cuotaPorVencer['concepto'] ?? '-')) ?></td>
                 <td><?= htmlspecialchars(!empty($cuotaPorVencer['fecha_vencimiento']) ? human_date((string) $cuotaPorVencer['fecha_vencimiento']) : '-') ?></td>
                 <td><span class="badge badge-status <?= htmlspecialchars(status_badge_class((string) ($cuotaPorVencer['estado_cuota'] ?? 'pendiente'))) ?>"><?= htmlspecialchars(status_label((string) ($cuotaPorVencer['estado_cuota'] ?? 'pendiente'))) ?></span></td>
@@ -101,7 +124,7 @@
           </table>
         </div>
       <?php else: ?>
-        <p class="small text-muted mb-0">Este socio no tiene cuotas pendientes por vencer.</p>
+        <p class="small text-muted mb-0">Este socio no tiene cuotas registradas.</p>
       <?php endif; ?>
     </div>
   </div>
@@ -122,6 +145,7 @@
                 <tr>
                   <th>#</th>
                   <th>Plan</th>
+                  <th>Tipo de periodo</th>
                   <th>Concepto</th>
                   <th>Vencimiento</th>
                   <th>Estado</th>
@@ -133,6 +157,7 @@
                   <tr>
                     <td><?= (int) ($index + 2) ?></td>
                     <td><?= htmlspecialchars((string) ($cuota['nombre_periodo'] ?? '-')) ?></td>
+                    <td><?= htmlspecialchars(ucfirst((string) ($cuota['tipo_periodo'] ?? '-'))) ?></td>
                     <td><?= htmlspecialchars((string) ($cuota['concepto'] ?? '-')) ?></td>
                     <td><?= htmlspecialchars(!empty($cuota['fecha_vencimiento']) ? human_date((string) $cuota['fecha_vencimiento']) : '-') ?></td>
                     <td><span class="badge badge-status <?= htmlspecialchars(status_badge_class((string) ($cuota['estado_cuota'] ?? 'pendiente'))) ?>"><?= htmlspecialchars(status_label((string) ($cuota['estado_cuota'] ?? 'pendiente'))) ?></span></td>
