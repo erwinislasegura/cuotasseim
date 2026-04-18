@@ -390,6 +390,17 @@ abstract class Controller
                 if (preg_match('/^Forma de retiro:\s*(.+)$/i', $observacion, $matches) === 1) {
                     $currentRecord['_forma_retiro'] = strtolower(trim((string) ($matches[1] ?? '')));
                 }
+
+                $visibleColumns = array_values(array_intersect([
+                    'id',
+                    'fecha',
+                    'tipo_egreso_id',
+                    'proveedor_destinatario',
+                    'descripcion',
+                    'monto',
+                    'numero_documento',
+                    'estado',
+                ], $data['columns']['all']));
             }
 
 
