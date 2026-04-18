@@ -182,6 +182,20 @@ class ModuleCatalog
             }
         }
 
+        if ($table === 'socios') {
+            $data['nombre_completo'] = trim(implode(' ', array_filter([
+                (string) ($data['nombres'] ?? ''),
+                (string) ($data['apellidos'] ?? ''),
+            ])));
+            if ($data['nombre_completo'] === '') {
+                $data['nombre_completo'] = null;
+            }
+
+            if ($id === null && empty($data['numero_socio'])) {
+                $data['numero_socio'] = self::nextSocioNumber();
+            }
+        }
+
         $db = Database::connection();
 
         if ($id !== null) {
@@ -214,6 +228,15 @@ class ModuleCatalog
             $stmt->bindValue(':' . $field, $value);
         }
         $stmt->execute();
+    }
+
+    public static function nextSocioNumber(): string
+    {
+        $db = Database::connection();
+        $stmt = $db->query("SELECT COALESCE(MAX(CAST(numero_socio AS UNSIGNED)), 0) FROM socios");
+        $next = ((int) $stmt->fetchColumn()) + 1;
+
+        return str_pad((string) $next, 6, '0', STR_PAD_LEFT);
     }
 
     public static function delete(string $table, string $primaryKey, int $id, bool $softDelete): void
