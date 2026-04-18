@@ -228,6 +228,48 @@ abstract class Controller
                 }
             }
 
+            if ($config['table'] === 'aportes') {
+                $formFields = ['socio_id', 'monto', 'comentario'];
+
+                $formMeta = [
+                    'types' => [
+                        'monto' => 'number',
+                        'comentario' => 'textarea',
+                    ],
+                    'labels' => [
+                        'socio_id' => 'Socio',
+                        'monto' => 'Monto donación',
+                        'comentario' => 'Detalle de la donación',
+                    ],
+                ];
+                $columnLabels = $formMeta['labels'];
+
+                $sociosStmt = Database::connection()->query('SELECT id, numero_socio, nombre_completo FROM socios WHERE deleted_at IS NULL ORDER BY nombre_completo ASC');
+                $formMeta['options']['socio_id'] = array_map(static function (array $item): array {
+                    $numeroSocio = trim((string) ($item['numero_socio'] ?? ''));
+                    $nombre = trim((string) ($item['nombre_completo'] ?? ''));
+                    $label = $nombre !== '' ? $nombre : ('Socio #' . (string) ($item['id'] ?? ''));
+                    if ($numeroSocio !== '') {
+                        $label .= ' · N° ' . $numeroSocio;
+                    }
+
+                    return [
+                        'value' => (string) ($item['id'] ?? ''),
+                        'label' => $label,
+                    ];
+                }, $sociosStmt->fetchAll());
+
+                $visibleColumns = array_values(array_intersect([
+                    'id',
+                    'socio_id',
+                    'monto',
+                    'comentario',
+                    'fecha_aporte',
+                    'estado',
+                ], $data['columns']['all']));
+            }
+
+
             $flashSuccess = $_SESSION['flash_success'] ?? null;
             $flashError = $_SESSION['flash_error'] ?? null;
             unset($_SESSION['flash_success'], $_SESSION['flash_error']);

@@ -108,6 +108,16 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
                 $fieldClass = 'col-md-6 col-lg-4';
               }
             }
+
+            if (($route ?? '') === 'aportes') {
+              if ((string) $field === 'socio_id') {
+                $fieldClass = 'col-md-8';
+              } elseif ((string) $field === 'monto') {
+                $fieldClass = 'col-md-4';
+              } elseif ((string) $field === 'comentario') {
+                $fieldClass = 'col-12';
+              }
+            }
           ?>
           <div class="<?= htmlspecialchars($fieldClass) ?>">
             <label class="form-label"><?= htmlspecialchars($fieldLabel) ?></label>
@@ -142,7 +152,11 @@ $isPaymentHistory = ($route ?? '') === 'pagos';
                 <small class="text-muted">Puedes seleccionar más de un plan (Ctrl/Cmd + clic).</small>
               <?php endif; ?>
             <?php else: ?>
-              <input type="<?= htmlspecialchars($fieldType) ?>" name="<?= htmlspecialchars((string) $field) ?>" value="<?= htmlspecialchars($value) ?>" class="form-control form-control-sm" <?= $isReadOnlyField ? 'readonly' : '' ?> <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>
+              <?php if ($fieldType === 'textarea'): ?>
+                <textarea name="<?= htmlspecialchars((string) $field) ?>" class="form-control form-control-sm" rows="3" <?= $isReadOnlyField ? 'readonly' : '' ?> <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>><?= htmlspecialchars($value) ?></textarea>
+              <?php else: ?>
+                <input type="<?= htmlspecialchars($fieldType) ?>" name="<?= htmlspecialchars((string) $field) ?>" value="<?= htmlspecialchars($value) ?>" class="form-control form-control-sm" <?= $isReadOnlyField ? 'readonly' : '' ?> <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>
+              <?php endif; ?>
             <?php endif; ?>
           </div>
         <?php endforeach; ?>
