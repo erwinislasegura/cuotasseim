@@ -30,6 +30,7 @@ class CuotasController extends Controller
         $cuotaPorVencer = null;
         $otrasCuotas = [];
         $mediosPago = [];
+        $sinPlanAsociado = false;
         $error = null;
 
         try {
@@ -56,6 +57,7 @@ class CuotasController extends Controller
                         $otrasCuotas = array_slice($cuotasPendientes, 1);
                     } else {
                         $cuotaPorVencer = $this->obtenerCuotaActualDesdePlan($db, $selectedSocioId);
+                        $sinPlanAsociado = $cuotaPorVencer === null;
                     }
                 }
             }
@@ -77,6 +79,7 @@ class CuotasController extends Controller
             'cuotaPorVencer' => $cuotaPorVencer,
             'otrasCuotas' => $otrasCuotas,
             'mediosPago' => $mediosPago,
+            'sinPlanAsociado' => $sinPlanAsociado,
             'token' => Csrf::token(),
             'flashSuccess' => $flashSuccess,
             'flashError' => $flashError,
