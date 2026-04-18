@@ -10,7 +10,7 @@ class AuditoriaController extends Controller
 {
     public function index(): void
     {
-        echo 'Auditoria: módulo en construcción con base MVC y DB preparada.';
+        $this->renderModule('auditoria');
     }
 
     public function crear(): void

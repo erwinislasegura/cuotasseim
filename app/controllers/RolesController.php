@@ -10,7 +10,7 @@ class RolesController extends Controller
 {
     public function index(): void
     {
-        echo 'Roles: módulo en construcción con base MVC y DB preparada.';
+        $this->renderModule('roles');
     }
 
     public function crear(): void

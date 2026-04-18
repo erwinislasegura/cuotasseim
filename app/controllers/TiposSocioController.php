@@ -10,7 +10,7 @@ class TiposSocioController extends Controller
 {
     public function index(): void
     {
-        echo 'TiposSocio: módulo en construcción con base MVC y DB preparada.';
+        $this->renderModule('tipos_socio');
     }
 
     public function crear(): void

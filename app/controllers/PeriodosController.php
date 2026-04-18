@@ -10,7 +10,7 @@ class PeriodosController extends Controller
 {
     public function index(): void
     {
-        echo 'Periodos: módulo en construcción con base MVC y DB preparada.';
+        $this->renderModule('periodos');
     }
 
     public function crear(): void

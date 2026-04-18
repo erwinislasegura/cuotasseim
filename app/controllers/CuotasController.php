@@ -10,7 +10,7 @@ class CuotasController extends Controller
 {
     public function index(): void
     {
-        echo 'Cuotas: módulo en construcción con base MVC y DB preparada.';
+        $this->renderModule('cuotas');
     }
 
     public function crear(): void
