@@ -1,0 +1,6 @@
+:root {
+  --bs-primary: #0f3b73;
+}
+body { font-size: 0.92rem; }
+.card { border-radius: .6rem; }
+.form-control-sm, .btn-sm { border-radius: .45rem; }

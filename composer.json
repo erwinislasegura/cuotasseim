@@ -1,0 +1,22 @@
+{
+  "name": "cuotasseim/sistema-gestion-cuotas",
+  "description": "Sistema MVC PHP para gestión de cuotas",
+  "type": "project",
+  "require": {
+    "php": ">=8.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "app/"
+    },
+    "files": [
+      "app/helpers/url_helper.php",
+      "app/helpers/money_helper.php",
+      "app/helpers/date_helper.php",
+      "app/helpers/auth_helper.php",
+      "app/helpers/status_helper.php",
+      "app/helpers/audit_helper.php",
+      "app/helpers/form_helper.php"
+    ]
+  }
+}
