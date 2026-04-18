@@ -244,7 +244,8 @@ abstract class Controller
                 ];
                 $columnLabels = $formMeta['labels'];
 
-                $sociosStmt = Database::connection()->query('SELECT id, numero_socio, nombre_completo FROM socios WHERE deleted_at IS NULL ORDER BY nombre_completo ASC');
+                $sociosStmt = Database::connection()->query('SELECT id, numero_socio, nombre_completo, rut, telefono, correo FROM socios WHERE deleted_at IS NULL ORDER BY nombre_completo ASC');
+                $socios = $sociosStmt->fetchAll();
                 $formMeta['options']['socio_id'] = array_map(static function (array $item): array {
                     $numeroSocio = trim((string) ($item['numero_socio'] ?? ''));
                     $nombre = trim((string) ($item['nombre_completo'] ?? ''));
@@ -257,7 +258,23 @@ abstract class Controller
                         'value' => (string) ($item['id'] ?? ''),
                         'label' => $label,
                     ];
-                }, $sociosStmt->fetchAll());
+                }, $socios);
+                $formMeta['socios_data'] = array_reduce($socios, static function (array $carry, array $item): array {
+                    $id = (int) ($item['id'] ?? 0);
+                    if ($id <= 0) {
+                        return $carry;
+                    }
+
+                    $carry[$id] = [
+                        'numero_socio' => trim((string) ($item['numero_socio'] ?? '')),
+                        'nombre_completo' => trim((string) ($item['nombre_completo'] ?? '')),
+                        'rut' => trim((string) ($item['rut'] ?? '')),
+                        'telefono' => trim((string) ($item['telefono'] ?? '')),
+                        'correo' => trim((string) ($item['correo'] ?? '')),
+                    ];
+
+                    return $carry;
+                }, []);
 
                 $visibleColumns = array_values(array_intersect([
                     'id',
