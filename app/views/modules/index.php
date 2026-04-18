@@ -89,8 +89,9 @@ $statusOptions = [
         <?php $fieldType = (string) (($formMeta['types'][$field] ?? 'text')); ?>
         <?php $isReadOnlyField = (bool) (($formMeta['readonly'][$field] ?? false) || ($isReadOnly ?? false)); ?>
         <?php $fieldOptions = $formMeta['options'][$field] ?? null; ?>
+        <?php $fieldLabel = (string) (($formMeta['labels'][$field] ?? ucwords(str_replace('_', ' ', (string) $field)))); ?>
         <div class="col-md-4 col-lg-3">
-          <label class="form-label"><?= htmlspecialchars(ucwords(str_replace('_', ' ', (string) $field))) ?></label>
+          <label class="form-label"><?= htmlspecialchars($fieldLabel) ?></label>
           <?php if (is_array($fieldOptions)): ?>
             <select name="<?= htmlspecialchars((string) $field) ?>" class="form-select form-select-sm" <?= $isReadOnlyField ? 'disabled' : '' ?>>
               <option value="">Seleccionar...</option>
@@ -189,7 +190,8 @@ $statusOptions = [
           <tr>
             <th>#</th>
             <?php foreach (($columns ?? []) as $column): ?>
-              <th><?= htmlspecialchars(ucwords(str_replace('_', ' ', (string) $column))) ?></th>
+              <?php $columnLabel = (string) (($columnLabels[$column] ?? ucwords(str_replace('_', ' ', (string) $column)))); ?>
+              <th><?= htmlspecialchars($columnLabel) ?></th>
             <?php endforeach; ?>
             <th class="text-end">Acciones</th>
           </tr>
