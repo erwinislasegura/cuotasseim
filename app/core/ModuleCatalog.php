@@ -401,6 +401,58 @@ class ModuleCatalog
             }
         }
 
+        if ($table === 'movimientos_tesoreria') {
+            if (empty($data['fecha'])) {
+                $data['fecha'] = date('Y-m-d');
+                if (!in_array('fecha', $persistFields, true)) {
+                    $persistFields[] = 'fecha';
+                }
+            }
+
+            $tipo = strtolower(trim((string) ($data['tipo_movimiento'] ?? 'ingreso')));
+            if (!in_array($tipo, ['ingreso', 'egreso'], true)) {
+                $tipo = 'ingreso';
+            }
+            $data['tipo_movimiento'] = $tipo;
+            if (!in_array('tipo_movimiento', $persistFields, true)) {
+                $persistFields[] = 'tipo_movimiento';
+            }
+
+            $ingreso = (float) ($data['ingreso'] ?? 0);
+            $egreso = (float) ($data['egreso'] ?? 0);
+            if ($tipo === 'ingreso') {
+                $ingreso = $ingreso > 0 ? $ingreso : 0;
+                $egreso = 0.0;
+            } else {
+                $egreso = $egreso > 0 ? $egreso : 0;
+                $ingreso = 0.0;
+            }
+            $data['ingreso'] = (string) $ingreso;
+            $data['egreso'] = (string) $egreso;
+            if (!in_array('ingreso', $persistFields, true)) {
+                $persistFields[] = 'ingreso';
+            }
+            if (!in_array('egreso', $persistFields, true)) {
+                $persistFields[] = 'egreso';
+            }
+
+            $data['origen_modulo'] = trim((string) ($data['origen_modulo'] ?? 'manual')) ?: 'manual';
+            if (!in_array('origen_modulo', $persistFields, true)) {
+                $persistFields[] = 'origen_modulo';
+            }
+
+            $referenciaId = (int) ($data['referencia_id'] ?? 0);
+            $data['referencia_id'] = $referenciaId > 0 ? (string) $referenciaId : null;
+            if (!in_array('referencia_id', $persistFields, true)) {
+                $persistFields[] = 'referencia_id';
+            }
+
+            if (!in_array('saldo_referencial', $persistFields, true)) {
+                $persistFields[] = 'saldo_referencial';
+            }
+            $data['saldo_referencial'] = '0';
+        }
+
         $db = Database::connection();
 
         if ($id !== null) {
@@ -416,8 +468,15 @@ class ModuleCatalog
             $stmt->bindValue(':pk', $id, PDO::PARAM_INT);
             $stmt->execute();
 
+            if (in_array($table, ['pagos', 'aportes', 'egresos'], true)) {
+                self::syncTreasuryMovementFromSource($table, $id);
+            }
+
             if ($table === 'socios' && self::tableExists('socio_planes')) {
                 self::syncSocioPlanes($id, self::normalizeIds($payload['planes_ids'] ?? []));
+            }
+            if ($table === 'movimientos_tesoreria') {
+                self::recalculateTreasuryBalance();
             }
             return;
         }
@@ -438,11 +497,19 @@ class ModuleCatalog
         }
         $stmt->execute();
 
+        $newId = (int) $db->lastInsertId();
+        if ($newId > 0 && in_array($table, ['pagos', 'aportes', 'egresos'], true)) {
+            self::syncTreasuryMovementFromSource($table, $newId);
+        }
+
         if ($table === 'socios' && self::tableExists('socio_planes')) {
-            $socioId = (int) $db->lastInsertId();
+            $socioId = $newId;
             if ($socioId > 0) {
                 self::syncSocioPlanes($socioId, self::normalizeIds($payload['planes_ids'] ?? []));
             }
+        }
+        if ($table === 'movimientos_tesoreria') {
+            self::recalculateTreasuryBalance();
         }
     }
 
@@ -557,6 +624,259 @@ class ModuleCatalog
 
         $stmt->bindValue(':id', $id, PDO::PARAM_INT);
         $stmt->execute();
+
+        if (in_array($table, ['pagos', 'aportes', 'egresos'], true)) {
+            self::deleteTreasuryMovement($table, $id);
+            self::recalculateTreasuryBalance();
+        }
+        if ($table === 'movimientos_tesoreria') {
+            self::recalculateTreasuryBalance();
+        }
+    }
+
+    private static function syncTreasuryMovementFromSource(string $sourceTable, int $sourceId): void
+    {
+        if ($sourceId <= 0 || !self::tableExists('movimientos_tesoreria')) {
+            return;
+        }
+
+        $snapshot = self::treasurySnapshotForSource($sourceTable, $sourceId);
+        if ($snapshot === null) {
+            self::deleteTreasuryMovement($sourceTable, $sourceId);
+            self::recalculateTreasuryBalance();
+            return;
+        }
+
+        $db = Database::connection();
+        $findStmt = $db->prepare(
+            'SELECT id FROM movimientos_tesoreria
+             WHERE origen_modulo = :origen_modulo AND referencia_id = :referencia_id
+             ORDER BY id ASC'
+        );
+        $findStmt->bindValue(':origen_modulo', $snapshot['origen_modulo']);
+        $findStmt->bindValue(':referencia_id', $sourceId, PDO::PARAM_INT);
+        $findStmt->execute();
+        $existingIds = array_map(static fn(array $row): int => (int) ($row['id'] ?? 0), $findStmt->fetchAll());
+
+        if (empty($existingIds)) {
+            $insertStmt = $db->prepare(
+                'INSERT INTO movimientos_tesoreria
+                (cuenta_bancaria_id, fecha, tipo_movimiento, origen_modulo, referencia_id, descripcion, ingreso, egreso, saldo_referencial)
+                VALUES (:cuenta_bancaria_id, :fecha, :tipo_movimiento, :origen_modulo, :referencia_id, :descripcion, :ingreso, :egreso, 0)'
+            );
+            self::bindTreasurySnapshot($insertStmt, $snapshot, $sourceId);
+            $insertStmt->execute();
+        } else {
+            $keeperId = (int) $existingIds[0];
+            $updateStmt = $db->prepare(
+                'UPDATE movimientos_tesoreria
+                 SET cuenta_bancaria_id = :cuenta_bancaria_id,
+                     fecha = :fecha,
+                     tipo_movimiento = :tipo_movimiento,
+                     descripcion = :descripcion,
+                     ingreso = :ingreso,
+                     egreso = :egreso
+                 WHERE id = :id'
+            );
+            self::bindTreasurySnapshot($updateStmt, $snapshot, $sourceId);
+            $updateStmt->bindValue(':id', $keeperId, PDO::PARAM_INT);
+            $updateStmt->execute();
+
+            if (count($existingIds) > 1) {
+                $idsToDelete = array_slice($existingIds, 1);
+                $placeholders = implode(',', array_fill(0, count($idsToDelete), '?'));
+                $deleteDuplicatesStmt = $db->prepare('DELETE FROM movimientos_tesoreria WHERE id IN (' . $placeholders . ')');
+                foreach ($idsToDelete as $index => $duplicateId) {
+                    $deleteDuplicatesStmt->bindValue($index + 1, $duplicateId, PDO::PARAM_INT);
+                }
+                $deleteDuplicatesStmt->execute();
+            }
+        }
+
+        self::recalculateTreasuryBalance();
+    }
+
+    private static function bindTreasurySnapshot(\PDOStatement $stmt, array $snapshot, int $sourceId): void
+    {
+        $stmt->bindValue(':cuenta_bancaria_id', $snapshot['cuenta_bancaria_id'], $snapshot['cuenta_bancaria_id'] !== null ? PDO::PARAM_INT : PDO::PARAM_NULL);
+        $stmt->bindValue(':fecha', $snapshot['fecha']);
+        $stmt->bindValue(':tipo_movimiento', $snapshot['tipo_movimiento']);
+        $stmt->bindValue(':origen_modulo', $snapshot['origen_modulo']);
+        $stmt->bindValue(':referencia_id', $sourceId, PDO::PARAM_INT);
+        $stmt->bindValue(':descripcion', $snapshot['descripcion']);
+        $stmt->bindValue(':ingreso', $snapshot['ingreso']);
+        $stmt->bindValue(':egreso', $snapshot['egreso']);
+    }
+
+    private static function treasurySnapshotForSource(string $sourceTable, int $sourceId): ?array
+    {
+        $db = Database::connection();
+
+        if ($sourceTable === 'pagos') {
+            $stmt = $db->prepare(
+                'SELECT p.id, p.socio_id, p.fecha_pago, p.monto_total, p.cuenta_bancaria_id, p.numero_comprobante, p.referencia_externa, p.observacion, p.estado_pago, p.deleted_at,
+                        COALESCE(s.nombre_completo, CONCAT(COALESCE(s.nombres, \'\'), \' \', COALESCE(s.apellidos, \'\'))) AS socio_nombre
+                 FROM pagos p
+                 LEFT JOIN socios s ON s.id = p.socio_id
+                 WHERE p.id = :id
+                 LIMIT 1'
+            );
+            $stmt->bindValue(':id', $sourceId, PDO::PARAM_INT);
+            $stmt->execute();
+            $row = $stmt->fetch() ?: null;
+            if ($row === null) {
+                return null;
+            }
+
+            if ((string) ($row['estado_pago'] ?? '') !== 'aplicado' || !empty($row['deleted_at'])) {
+                return null;
+            }
+
+            $descripcion = 'Pago socio';
+            $socioNombre = trim((string) ($row['socio_nombre'] ?? ''));
+            if ($socioNombre !== '') {
+                $descripcion .= ': ' . $socioNombre;
+            }
+            $comprobante = trim((string) ($row['numero_comprobante'] ?? ''));
+            if ($comprobante !== '') {
+                $descripcion .= ' · Comprobante ' . $comprobante;
+            }
+
+            return [
+                'cuenta_bancaria_id' => isset($row['cuenta_bancaria_id']) ? (int) $row['cuenta_bancaria_id'] : null,
+                'fecha' => (string) ($row['fecha_pago'] ?? date('Y-m-d')),
+                'tipo_movimiento' => 'ingreso',
+                'origen_modulo' => 'pagos',
+                'descripcion' => $descripcion,
+                'ingreso' => (float) ($row['monto_total'] ?? 0),
+                'egreso' => 0.0,
+            ];
+        }
+
+        if ($sourceTable === 'aportes') {
+            $stmt = $db->prepare(
+                'SELECT a.id, a.nombre_aportante, a.fecha_aporte, a.monto, a.estado, a.comprobante, a.descripcion,
+                        a.socio_id, COALESCE(s.nombre_completo, CONCAT(COALESCE(s.nombres, \'\'), \' \', COALESCE(s.apellidos, \'\'))) AS socio_nombre
+                 FROM aportes a
+                 LEFT JOIN socios s ON s.id = a.socio_id
+                 WHERE a.id = :id
+                 LIMIT 1'
+            );
+            $stmt->bindValue(':id', $sourceId, PDO::PARAM_INT);
+            $stmt->execute();
+            $row = $stmt->fetch() ?: null;
+            if ($row === null) {
+                return null;
+            }
+
+            if ((string) ($row['estado'] ?? '') !== 'aplicado') {
+                return null;
+            }
+
+            $aportante = trim((string) ($row['nombre_aportante'] ?? ''));
+            if ($aportante === '') {
+                $aportante = trim((string) ($row['socio_nombre'] ?? ''));
+            }
+            $descripcion = 'Aporte';
+            if ($aportante !== '') {
+                $descripcion .= ': ' . $aportante;
+            }
+            $comprobante = trim((string) ($row['comprobante'] ?? ''));
+            if ($comprobante !== '') {
+                $descripcion .= ' · Comprobante ' . $comprobante;
+            }
+
+            return [
+                'cuenta_bancaria_id' => null,
+                'fecha' => (string) ($row['fecha_aporte'] ?? date('Y-m-d')),
+                'tipo_movimiento' => 'ingreso',
+                'origen_modulo' => 'aportes',
+                'descripcion' => $descripcion,
+                'ingreso' => (float) ($row['monto'] ?? 0),
+                'egreso' => 0.0,
+            ];
+        }
+
+        if ($sourceTable === 'egresos') {
+            $stmt = $db->prepare(
+                'SELECT e.id, e.fecha, e.descripcion, e.monto, e.numero_documento, e.proveedor_destinatario, e.estado, e.deleted_at, e.cuenta_bancaria_id
+                 FROM egresos e
+                 WHERE e.id = :id
+                 LIMIT 1'
+            );
+            $stmt->bindValue(':id', $sourceId, PDO::PARAM_INT);
+            $stmt->execute();
+            $row = $stmt->fetch() ?: null;
+            if ($row === null) {
+                return null;
+            }
+
+            if ((string) ($row['estado'] ?? '') !== 'aplicado' || !empty($row['deleted_at'])) {
+                return null;
+            }
+
+            $descripcion = 'Egreso';
+            $motivo = trim((string) ($row['descripcion'] ?? ''));
+            if ($motivo !== '') {
+                $descripcion .= ': ' . $motivo;
+            }
+            $destinatario = trim((string) ($row['proveedor_destinatario'] ?? ''));
+            if ($destinatario !== '') {
+                $descripcion .= ' · Destinatario ' . $destinatario;
+            }
+
+            return [
+                'cuenta_bancaria_id' => isset($row['cuenta_bancaria_id']) ? (int) $row['cuenta_bancaria_id'] : null,
+                'fecha' => (string) ($row['fecha'] ?? date('Y-m-d')),
+                'tipo_movimiento' => 'egreso',
+                'origen_modulo' => 'egresos',
+                'descripcion' => $descripcion,
+                'ingreso' => 0.0,
+                'egreso' => (float) ($row['monto'] ?? 0),
+            ];
+        }
+
+        return null;
+    }
+
+    private static function deleteTreasuryMovement(string $sourceTable, int $sourceId): void
+    {
+        if ($sourceId <= 0 || !self::tableExists('movimientos_tesoreria')) {
+            return;
+        }
+
+        $stmt = Database::connection()->prepare(
+            'DELETE FROM movimientos_tesoreria
+             WHERE origen_modulo = :origen_modulo
+               AND referencia_id = :referencia_id'
+        );
+        $stmt->bindValue(':origen_modulo', $sourceTable);
+        $stmt->bindValue(':referencia_id', $sourceId, PDO::PARAM_INT);
+        $stmt->execute();
+    }
+
+    private static function recalculateTreasuryBalance(): void
+    {
+        if (!self::tableExists('movimientos_tesoreria')) {
+            return;
+        }
+
+        $db = Database::connection();
+        $stmt = $db->query(
+            'SELECT id, ingreso, egreso
+             FROM movimientos_tesoreria
+             ORDER BY fecha ASC, id ASC'
+        );
+        $rows = $stmt->fetchAll();
+
+        $runningBalance = 0.0;
+        $updateStmt = $db->prepare('UPDATE movimientos_tesoreria SET saldo_referencial = :saldo WHERE id = :id');
+        foreach ($rows as $row) {
+            $runningBalance += (float) ($row['ingreso'] ?? 0) - (float) ($row['egreso'] ?? 0);
+            $updateStmt->bindValue(':saldo', $runningBalance);
+            $updateStmt->bindValue(':id', (int) ($row['id'] ?? 0), PDO::PARAM_INT);
+            $updateStmt->execute();
+        }
     }
 
     private static function fetchStatusCounts(PDO $db, string $table, array $columnsMeta, string $query, ?string $from, ?string $to, array $extraConditions = []): array

@@ -951,6 +951,39 @@ $reportQueryParams = array_merge([
       });
     });
 
+    <?php if (($route ?? '') === 'tesoreria'): ?>
+      const tipoMovimientoSelect = document.querySelector('select[name="tipo_movimiento"]');
+      const ingresoInput = document.querySelector('input[name="ingreso"]');
+      const egresoInput = document.querySelector('input[name="egreso"]');
+      const actualizarCamposTesoreria = function () {
+        if (!tipoMovimientoSelect || !ingresoInput || !egresoInput) {
+          return;
+        }
+
+        const tipo = String(tipoMovimientoSelect.value || 'ingreso').toLowerCase();
+        const esIngreso = tipo === 'ingreso';
+        ingresoInput.readOnly = !esIngreso;
+        egresoInput.readOnly = esIngreso;
+
+        if (esIngreso) {
+          egresoInput.value = '';
+          egresoInput.classList.add('bg-light');
+          ingresoInput.classList.remove('bg-light');
+          ingresoInput.focus();
+        } else {
+          ingresoInput.value = '';
+          ingresoInput.classList.add('bg-light');
+          egresoInput.classList.remove('bg-light');
+          egresoInput.focus();
+        }
+      };
+
+      if (tipoMovimientoSelect && ingresoInput && egresoInput) {
+        tipoMovimientoSelect.addEventListener('change', actualizarCamposTesoreria);
+        actualizarCamposTesoreria();
+      }
+    <?php endif; ?>
+
     <?php if (!empty($viewRecordDisplay)): ?>
       const initialRecord = <?= json_encode((static function () use ($viewRecordDisplay, $formFields, $columnLabels, $primaryKey, $route): array {
           $details = [];
