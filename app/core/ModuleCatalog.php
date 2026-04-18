@@ -20,7 +20,7 @@ class ModuleCatalog
             'tipos_socio' => ['title' => 'Tipos de socio', 'description' => 'Catálogo de categorías y segmentación de socios.', 'table' => 'tipos_socio', 'route' => 'tipos-socio'],
             'periodos' => ['title' => 'Planes', 'description' => 'Creación de planes de cobro por frecuencia.', 'table' => 'periodos', 'route' => 'periodos'],
             'conceptos_cobro' => ['title' => 'Conceptos de cobro', 'description' => 'Definición de conceptos recurrentes y extraordinarios.', 'table' => 'conceptos_cobro', 'route' => 'conceptos-cobro'],
-            'cuotas' => ['title' => 'Cuotas', 'description' => 'Control de cuotas con foco en morosidad y cobranzas.', 'table' => 'cuotas', 'route' => 'cuotas'],
+            'cuotas' => ['title' => 'Registro de cuotas', 'description' => 'Selección de socio para revisar cuota por vencer y cuotas pendientes.', 'table' => 'cuotas', 'route' => 'cuotas'],
             'medios_pago' => ['title' => 'Medios de pago', 'description' => 'Catálogo de medios habilitados para recaudación.', 'table' => 'medios_pago', 'route' => 'medios-pago'],
             'pagos' => ['title' => 'Pagos', 'description' => 'Registro, imputación y trazabilidad de pagos.', 'table' => 'pagos', 'route' => 'pagos'],
             'tipos_aporte' => ['title' => 'Tipos de aporte', 'description' => 'Clasificación de aportes extraordinarios.', 'table' => 'tipos_aporte', 'route' => 'tipos-aporte'],
@@ -267,7 +267,7 @@ class ModuleCatalog
             $stmt->bindValue(':pk', $id, PDO::PARAM_INT);
             $stmt->execute();
 
-            if ($table === 'socios') {
+            if ($table === 'socios' && self::tableExists('socio_planes')) {
                 self::syncSocioPlanes($id, self::normalizeIds($payload['planes_ids'] ?? []));
             }
             return;
@@ -289,7 +289,7 @@ class ModuleCatalog
         }
         $stmt->execute();
 
-        if ($table === 'socios') {
+        if ($table === 'socios' && self::tableExists('socio_planes')) {
             $socioId = (int) $db->lastInsertId();
             if ($socioId > 0) {
                 self::syncSocioPlanes($socioId, self::normalizeIds($payload['planes_ids'] ?? []));
@@ -299,7 +299,7 @@ class ModuleCatalog
 
     public static function fetchSocioPlanes(int $socioId): array
     {
-        if ($socioId <= 0) {
+        if ($socioId <= 0 || !self::tableExists('socio_planes')) {
             return [];
         }
 
@@ -348,6 +348,29 @@ class ModuleCatalog
         $ids = array_values(array_unique(array_filter($ids, static fn(int $id): bool => $id > 0)));
 
         return $ids;
+    }
+
+    public static function tableExists(string $table): bool
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :table_name'
+        );
+        $stmt->bindValue(':table_name', $table);
+        $stmt->execute();
+
+        return (int) $stmt->fetchColumn() > 0;
+    }
+
+    public static function columnExists(string $table, string $column): bool
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = :table_name AND column_name = :column_name'
+        );
+        $stmt->bindValue(':table_name', $table);
+        $stmt->bindValue(':column_name', $column);
+        $stmt->execute();
+
+        return (int) $stmt->fetchColumn() > 0;
     }
 
     public static function nextSocioNumber(): string
