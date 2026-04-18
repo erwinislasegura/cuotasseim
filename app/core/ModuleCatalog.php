@@ -224,6 +224,7 @@ class ModuleCatalog
 
     public static function save(string $table, string $primaryKey, array $fields, array $payload, ?int $id = null): void
     {
+        $persistFields = $fields;
         $data = [];
         foreach ($fields as $field) {
             $data[$field] = trim((string) ($payload[$field] ?? ''));
@@ -252,11 +253,95 @@ class ModuleCatalog
             $data['cerrado'] = (string) ($data['cerrado'] ?? '0');
         }
 
+        if ($table === 'aportes') {
+            $comentario = trim((string) ($data['comentario'] ?? $payload['comentario'] ?? ''));
+            $comentario = $comentario !== '' ? $comentario : null;
+
+            if (self::columnExists('aportes', 'comentario')) {
+                $data['comentario'] = $comentario;
+                if (!in_array('comentario', $persistFields, true)) {
+                    $persistFields[] = 'comentario';
+                }
+            }
+
+            if (self::columnExists('aportes', 'descripcion')) {
+                $data['descripcion'] = $comentario;
+                if (!in_array('descripcion', $persistFields, true)) {
+                    $persistFields[] = 'descripcion';
+                }
+            }
+
+            if (self::columnExists('aportes', 'observacion')) {
+                $data['observacion'] = $comentario;
+                if (!in_array('observacion', $persistFields, true)) {
+                    $persistFields[] = 'observacion';
+                }
+            }
+
+            $socioId = (int) ($data['socio_id'] ?? 0);
+            if ($socioId > 0) {
+                $stmtSocio = Database::connection()->prepare('SELECT nombre_completo, nombres, apellidos FROM socios WHERE id = :id LIMIT 1');
+                $stmtSocio->bindValue(':id', $socioId, PDO::PARAM_INT);
+                $stmtSocio->execute();
+                $socio = $stmtSocio->fetch() ?: [];
+                $nombreAportante = trim((string) ($socio['nombre_completo'] ?? ''));
+                if ($nombreAportante === '') {
+                    $nombreAportante = trim(implode(' ', array_filter([
+                        (string) ($socio['nombres'] ?? ''),
+                        (string) ($socio['apellidos'] ?? ''),
+                    ])));
+                }
+
+                if (self::columnExists('aportes', 'nombre_aportante')) {
+                    $data['nombre_aportante'] = $nombreAportante !== '' ? $nombreAportante : null;
+                    if (!in_array('nombre_aportante', $persistFields, true)) {
+                        $persistFields[] = 'nombre_aportante';
+                    }
+                }
+            }
+
+            if (self::columnExists('aportes', 'fecha_aporte')) {
+                $data['fecha_aporte'] = (string) ($data['fecha_aporte'] ?? date('Y-m-d'));
+                if (!in_array('fecha_aporte', $persistFields, true)) {
+                    $persistFields[] = 'fecha_aporte';
+                }
+            }
+
+            if (self::columnExists('aportes', 'estado')) {
+                $data['estado'] = (string) ($data['estado'] ?? 'aplicado');
+                if (!in_array('estado', $persistFields, true)) {
+                    $persistFields[] = 'estado';
+                }
+            }
+
+            if (self::columnExists('aportes', 'usuario_id')) {
+                $usuario = Auth::user();
+                $data['usuario_id'] = (string) ((int) ($usuario['id'] ?? $_SESSION['user_id'] ?? 1));
+                if (!in_array('usuario_id', $persistFields, true)) {
+                    $persistFields[] = 'usuario_id';
+                }
+            }
+
+            if (self::columnExists('aportes', 'tipo_aporte_id')) {
+                $tipoAporteId = 0;
+                $stmtTipo = Database::connection()->query("SELECT id FROM tipos_aporte WHERE activo = 1 AND LOWER(nombre) LIKE 'don%' ORDER BY id ASC LIMIT 1");
+                $tipoAporteId = (int) ($stmtTipo->fetchColumn() ?: 0);
+                if ($tipoAporteId <= 0) {
+                    $stmtTipo = Database::connection()->query('SELECT id FROM tipos_aporte WHERE activo = 1 ORDER BY id ASC LIMIT 1');
+                    $tipoAporteId = (int) ($stmtTipo->fetchColumn() ?: 0);
+                }
+                $data['tipo_aporte_id'] = $tipoAporteId > 0 ? (string) $tipoAporteId : null;
+                if (!in_array('tipo_aporte_id', $persistFields, true)) {
+                    $persistFields[] = 'tipo_aporte_id';
+                }
+            }
+        }
+
         $db = Database::connection();
 
         if ($id !== null) {
             $sets = [];
-            foreach ($fields as $field) {
+            foreach ($persistFields as $field) {
                 $sets[] = "`{$field}` = :{$field}";
             }
             $sql = 'UPDATE `' . $table . '` SET ' . implode(', ', $sets) . ' WHERE `' . $primaryKey . '` = :pk';
