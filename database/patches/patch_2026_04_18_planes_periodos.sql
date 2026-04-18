@@ -25,8 +25,17 @@ ALTER TABLE periodos
     MODIFY COLUMN tipo_periodo ENUM('mensual','trimestral','semestral','anual') NOT NULL,
     MODIFY COLUMN monto_a_pagar DECIMAL(12,2) NOT NULL DEFAULT 0;
 
-ALTER TABLE periodos
-    DROP INDEX uk_periodo;
+SET @uk_periodo_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE()
+      AND table_name = 'periodos'
+      AND index_name = 'uk_periodo'
+);
+SET @drop_uk_periodo_sql := IF(@uk_periodo_exists > 0, 'ALTER TABLE periodos DROP INDEX uk_periodo', 'SELECT 1');
+PREPARE drop_uk_periodo_stmt FROM @drop_uk_periodo_sql;
+EXECUTE drop_uk_periodo_stmt;
+DEALLOCATE PREPARE drop_uk_periodo_stmt;
 
 CREATE TABLE IF NOT EXISTS socio_planes (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

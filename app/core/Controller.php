@@ -194,18 +194,29 @@ abstract class Controller
                     'value' => (string) $item['id'],
                     'label' => (string) $item['nombre'],
                 ], $estadoSocioStmt->fetchAll());
-                $planesStmt = Database::connection()->query('SELECT id, nombre_periodo, tipo_periodo, monto_a_pagar FROM periodos ORDER BY nombre_periodo ASC');
-                $formMeta['options']['planes_ids'] = array_map(static function (array $item): array {
-                    return [
-                        'value' => (string) $item['id'],
-                        'label' => sprintf(
-                            '%s · %s · $%s',
-                            (string) ($item['nombre_periodo'] ?? ''),
-                            ucfirst((string) ($item['tipo_periodo'] ?? '')),
-                            number_format((float) ($item['monto_a_pagar'] ?? 0), 0, ',', '.')
-                        ),
-                    ];
-                }, $planesStmt->fetchAll());
+                $planNameColumn = ModuleCatalog::columnExists('periodos', 'nombre_periodo') ? 'nombre_periodo' : null;
+                $planTypeColumn = ModuleCatalog::columnExists('periodos', 'tipo_periodo') ? 'tipo_periodo' : null;
+                $planAmountColumn = ModuleCatalog::columnExists('periodos', 'monto_a_pagar') ? 'monto_a_pagar' : null;
+                $planColumns = array_filter(['id', $planNameColumn, $planTypeColumn, $planAmountColumn]);
+                $formMeta['options']['planes_ids'] = [];
+                if (!empty($planColumns)) {
+                    $planesStmt = Database::connection()->query('SELECT ' . implode(', ', $planColumns) . ' FROM periodos ORDER BY id DESC');
+                    $formMeta['options']['planes_ids'] = array_map(static function (array $item) use ($planNameColumn, $planTypeColumn, $planAmountColumn): array {
+                        $name = (string) ($item[$planNameColumn ?? ''] ?? ('Plan #' . (string) ($item['id'] ?? '')));
+                        $type = $planTypeColumn ? ucfirst((string) ($item[$planTypeColumn] ?? '')) : '';
+                        $amount = $planAmountColumn ? number_format((float) ($item[$planAmountColumn] ?? 0), 0, ',', '.') : null;
+                        $parts = array_filter([
+                            $name,
+                            $type !== '' ? $type : null,
+                            $amount !== null ? '$' . $amount : null,
+                        ]);
+
+                        return [
+                            'value' => (string) ($item['id'] ?? ''),
+                            'label' => implode(' · ', $parts),
+                        ];
+                    }, $planesStmt->fetchAll());
+                }
 
                 if ($currentRecord === null) {
                     $currentRecord = [
