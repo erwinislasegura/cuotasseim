@@ -158,6 +158,24 @@ $reportQueryParams = array_merge([
           </div>
         <?php endif; ?>
 
+        <?php if (($route ?? '') === 'tesoreria'): ?>
+          <div class="col-md-4">
+            <label class="form-label">Ajuste asociado</label>
+            <select name="ajuste_modulo" id="ajusteModulo" class="form-select form-select-sm">
+              <?php foreach (($formMeta['ajustes_origen_options'] ?? []) as $option): ?>
+                <option value="<?= htmlspecialchars((string) ($option['value'] ?? '')) ?>"><?= htmlspecialchars((string) ($option['label'] ?? '')) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <small class="text-muted">Opcional: vincula este movimiento como ajuste de otro módulo.</small>
+          </div>
+          <div class="col-md-8 d-none" id="ajusteReferenciaWrap">
+            <label class="form-label">Registro de referencia</label>
+            <select name="ajuste_referencia_id" id="ajusteReferenciaId" class="form-select form-select-sm">
+              <option value="">Seleccionar referencia...</option>
+            </select>
+          </div>
+        <?php endif; ?>
+
         <?php foreach (($formFields ?? []) as $field): ?>
           <?php
             $rawFieldValue = $currentRecord[$field] ?? '';
@@ -955,6 +973,10 @@ $reportQueryParams = array_merge([
       const tipoMovimientoSelect = document.querySelector('select[name="tipo_movimiento"]');
       const ingresoInput = document.querySelector('input[name="ingreso"]');
       const egresoInput = document.querySelector('input[name="egreso"]');
+      const ajusteModuloSelect = document.getElementById('ajusteModulo');
+      const ajusteReferenciaWrap = document.getElementById('ajusteReferenciaWrap');
+      const ajusteReferenciaSelect = document.getElementById('ajusteReferenciaId');
+      const referenciasAjuste = <?= json_encode(($formMeta['ajustes_referencia_options'] ?? []), JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_TAG) ?>;
       const actualizarCamposTesoreria = function () {
         if (!tipoMovimientoSelect || !ingresoInput || !egresoInput) {
           return;
@@ -979,8 +1001,37 @@ $reportQueryParams = array_merge([
       };
 
       if (tipoMovimientoSelect && ingresoInput && egresoInput) {
-        tipoMovimientoSelect.addEventListener('change', actualizarCamposTesoreria);
+          tipoMovimientoSelect.addEventListener('change', actualizarCamposTesoreria);
         actualizarCamposTesoreria();
+      }
+
+      const actualizarReferenciasAjuste = function () {
+        if (!ajusteModuloSelect || !ajusteReferenciaWrap || !ajusteReferenciaSelect) {
+          return;
+        }
+
+        const modulo = String(ajusteModuloSelect.value || '').toLowerCase();
+        const opciones = Array.isArray(referenciasAjuste[modulo]) ? referenciasAjuste[modulo] : [];
+        ajusteReferenciaSelect.innerHTML = '<option value="">Seleccionar referencia...</option>';
+
+        if (!modulo || opciones.length === 0) {
+          ajusteReferenciaWrap.classList.add('d-none');
+          ajusteReferenciaSelect.value = '';
+          return;
+        }
+
+        opciones.forEach(function (item) {
+          const option = document.createElement('option');
+          option.value = String(item && item.value ? item.value : '');
+          option.textContent = String(item && item.label ? item.label : '');
+          ajusteReferenciaSelect.appendChild(option);
+        });
+        ajusteReferenciaWrap.classList.remove('d-none');
+      };
+
+      if (ajusteModuloSelect && ajusteReferenciaSelect) {
+        ajusteModuloSelect.addEventListener('change', actualizarReferenciasAjuste);
+        actualizarReferenciasAjuste();
       }
     <?php endif; ?>
 

@@ -829,6 +829,55 @@ abstract class Controller
                 ];
                 $columnLabels = $formMeta['labels'];
 
+                $ajustePagosStmt = Database::connection()->query(
+                    'SELECT p.id, p.fecha_pago AS fecha, p.monto_total AS monto, COALESCE(s.nombre_completo, CONCAT(COALESCE(s.nombres, \'\'), \' \', COALESCE(s.apellidos, \'\'))) AS titular
+                     FROM pagos p
+                     LEFT JOIN socios s ON s.id = p.socio_id
+                     WHERE p.deleted_at IS NULL
+                     ORDER BY p.id DESC
+                     LIMIT 200'
+                );
+                $ajusteAportesStmt = Database::connection()->query(
+                    'SELECT a.id, a.fecha_aporte AS fecha, a.monto AS monto, COALESCE(a.nombre_aportante, COALESCE(s.nombre_completo, CONCAT(COALESCE(s.nombres, \'\'), \' \', COALESCE(s.apellidos, \'\')))) AS titular
+                     FROM aportes a
+                     LEFT JOIN socios s ON s.id = a.socio_id
+                     ORDER BY a.id DESC
+                     LIMIT 200'
+                );
+                $ajusteEgresosStmt = Database::connection()->query(
+                    'SELECT e.id, e.fecha AS fecha, e.monto AS monto, e.proveedor_destinatario AS titular
+                     FROM egresos e
+                     WHERE e.deleted_at IS NULL
+                     ORDER BY e.id DESC
+                     LIMIT 200'
+                );
+
+                $mapAjustes = static function (array $rows): array {
+                    return array_map(static function (array $row): array {
+                        $id = (string) ($row['id'] ?? '');
+                        $fecha = trim((string) ($row['fecha'] ?? ''));
+                        $titular = trim((string) ($row['titular'] ?? ''));
+                        $monto = number_format((float) ($row['monto'] ?? 0), 0, ',', '.');
+
+                        return [
+                            'value' => $id,
+                            'label' => '#' . $id . ' · ' . ($fecha !== '' ? $fecha : '-') . ' · $' . $monto . ($titular !== '' ? ' · ' . $titular : ''),
+                        ];
+                    }, $rows);
+                };
+
+                $formMeta['ajustes_origen_options'] = [
+                    ['value' => '', 'label' => 'Sin ajuste asociado'],
+                    ['value' => 'pagos', 'label' => 'Ajuste sobre Pagos'],
+                    ['value' => 'aportes', 'label' => 'Ajuste sobre Aportes'],
+                    ['value' => 'egresos', 'label' => 'Ajuste sobre Egresos'],
+                ];
+                $formMeta['ajustes_referencia_options'] = [
+                    'pagos' => $mapAjustes($ajustePagosStmt->fetchAll()),
+                    'aportes' => $mapAjustes($ajusteAportesStmt->fetchAll()),
+                    'egresos' => $mapAjustes($ajusteEgresosStmt->fetchAll()),
+                ];
+
                 if (in_array('cuenta_bancaria_id', $formFields, true)) {
                     $cuentasStmt = Database::connection()->query('SELECT id, banco, tipo_cuenta, numero_cuenta, titular FROM cuentas_bancarias WHERE activa = 1 ORDER BY banco ASC, numero_cuenta ASC');
                     $formMeta['options']['cuenta_bancaria_id'] = array_map(static function (array $item): array {

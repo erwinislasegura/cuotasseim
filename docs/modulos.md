@@ -11,3 +11,4 @@ Cada módulo está preconectado bajo MVC y rutas limpias para crecer con CRUD co
   - **Egresos** (egresos).
 - Si un registro cambia a estado distinto de `aplicado` o se elimina, su movimiento asociado se retira de tesorería.
 - El `saldo_referencial` se recalcula automáticamente en cada sincronización.
+- El formulario permite registrar **ajustes integrados** vinculando el movimiento manual con un registro de `pagos`, `aportes` o `egresos` (`origen_modulo = ajuste_*`).

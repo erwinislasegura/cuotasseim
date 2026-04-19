@@ -436,14 +436,26 @@ class ModuleCatalog
                 $persistFields[] = 'egreso';
             }
 
-            $data['origen_modulo'] = trim((string) ($data['origen_modulo'] ?? 'manual')) ?: 'manual';
+            $ajusteModulo = strtolower(trim((string) ($payload['ajuste_modulo'] ?? '')));
+            $ajusteReferenciaId = (int) ($payload['ajuste_referencia_id'] ?? 0);
+            if (in_array($ajusteModulo, ['pagos', 'aportes', 'egresos'], true) && $ajusteReferenciaId > 0) {
+                $data['origen_modulo'] = 'ajuste_' . $ajusteModulo;
+                $data['referencia_id'] = (string) $ajusteReferenciaId;
+                if (trim((string) ($data['descripcion'] ?? '')) === '') {
+                    $data['descripcion'] = 'Ajuste sobre ' . $ajusteModulo . ' #' . $ajusteReferenciaId;
+                }
+            } else {
+                $data['origen_modulo'] = trim((string) ($data['origen_modulo'] ?? 'manual')) ?: 'manual';
+            }
             if (!in_array('origen_modulo', $persistFields, true)) {
                 $persistFields[] = 'origen_modulo';
             }
 
-            $referenciaId = (int) ($data['referencia_id'] ?? 0);
-            $data['referencia_id'] = $referenciaId > 0 ? (string) $referenciaId : null;
-            if (!in_array('referencia_id', $persistFields, true)) {
+            if (!array_key_exists('referencia_id', $data)) {
+                $referenciaId = (int) ($data['referencia_id'] ?? 0);
+                $data['referencia_id'] = $referenciaId > 0 ? (string) $referenciaId : null;
+            }
+            if (!in_array('referencia_id', $persistFields, true) && self::columnExists('movimientos_tesoreria', 'referencia_id')) {
                 $persistFields[] = 'referencia_id';
             }
 
