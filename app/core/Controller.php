@@ -784,6 +784,140 @@ abstract class Controller
                 ];
             }
 
+            if ($config['table'] === 'movimientos_tesoreria' && ($config['route'] ?? '') === 'tesoreria') {
+                $formFields = array_values(array_intersect([
+                    'fecha',
+                    'tipo_movimiento',
+                    'descripcion',
+                    'ingreso',
+                    'egreso',
+                    'cuenta_bancaria_id',
+                ], $data['columns']['form']));
+
+                $formMeta = [
+                    'types' => [
+                        'fecha' => 'date',
+                        'descripcion' => 'textarea',
+                        'ingreso' => 'number',
+                        'egreso' => 'number',
+                    ],
+                    'labels' => [
+                        'fecha' => 'Fecha movimiento',
+                        'tipo_movimiento' => 'Tipo movimiento',
+                        'descripcion' => 'Descripción / motivo',
+                        'ingreso' => 'Monto ingreso',
+                        'egreso' => 'Monto egreso',
+                        'cuenta_bancaria_id' => 'Cuenta bancaria',
+                        'origen_modulo' => 'Origen',
+                        'saldo_referencial' => 'Saldo referencial',
+                    ],
+                    'options' => [
+                        'tipo_movimiento' => [
+                            ['value' => 'ingreso', 'label' => 'Ingreso'],
+                            ['value' => 'egreso', 'label' => 'Egreso'],
+                        ],
+                    ],
+                    'required' => [
+                        'fecha' => true,
+                        'tipo_movimiento' => true,
+                        'descripcion' => true,
+                    ],
+                    'attributes' => [
+                        'ingreso' => ['step' => '0.01', 'min' => '0'],
+                        'egreso' => ['step' => '0.01', 'min' => '0'],
+                    ],
+                ];
+                $columnLabels = $formMeta['labels'];
+
+                $ajustePagosStmt = Database::connection()->query(
+                    'SELECT p.id, p.fecha_pago AS fecha, p.monto_total AS monto, COALESCE(s.nombre_completo, CONCAT(COALESCE(s.nombres, \'\'), \' \', COALESCE(s.apellidos, \'\'))) AS titular
+                     FROM pagos p
+                     LEFT JOIN socios s ON s.id = p.socio_id
+                     WHERE p.deleted_at IS NULL
+                     ORDER BY p.id DESC
+                     LIMIT 200'
+                );
+                $ajusteAportesStmt = Database::connection()->query(
+                    'SELECT a.id, a.fecha_aporte AS fecha, a.monto AS monto, COALESCE(a.nombre_aportante, COALESCE(s.nombre_completo, CONCAT(COALESCE(s.nombres, \'\'), \' \', COALESCE(s.apellidos, \'\')))) AS titular
+                     FROM aportes a
+                     LEFT JOIN socios s ON s.id = a.socio_id
+                     ORDER BY a.id DESC
+                     LIMIT 200'
+                );
+                $ajusteEgresosStmt = Database::connection()->query(
+                    'SELECT e.id, e.fecha AS fecha, e.monto AS monto, e.proveedor_destinatario AS titular
+                     FROM egresos e
+                     WHERE e.deleted_at IS NULL
+                     ORDER BY e.id DESC
+                     LIMIT 200'
+                );
+
+                $mapAjustes = static function (array $rows): array {
+                    return array_map(static function (array $row): array {
+                        $id = (string) ($row['id'] ?? '');
+                        $fecha = trim((string) ($row['fecha'] ?? ''));
+                        $titular = trim((string) ($row['titular'] ?? ''));
+                        $monto = number_format((float) ($row['monto'] ?? 0), 0, ',', '.');
+
+                        return [
+                            'value' => $id,
+                            'label' => '#' . $id . ' · ' . ($fecha !== '' ? $fecha : '-') . ' · $' . $monto . ($titular !== '' ? ' · ' . $titular : ''),
+                        ];
+                    }, $rows);
+                };
+
+                $formMeta['ajustes_origen_options'] = [
+                    ['value' => '', 'label' => 'Sin ajuste asociado'],
+                    ['value' => 'pagos', 'label' => 'Ajuste sobre Pagos'],
+                    ['value' => 'aportes', 'label' => 'Ajuste sobre Aportes'],
+                    ['value' => 'egresos', 'label' => 'Ajuste sobre Egresos'],
+                ];
+                $formMeta['ajustes_referencia_options'] = [
+                    'pagos' => $mapAjustes($ajustePagosStmt->fetchAll()),
+                    'aportes' => $mapAjustes($ajusteAportesStmt->fetchAll()),
+                    'egresos' => $mapAjustes($ajusteEgresosStmt->fetchAll()),
+                ];
+
+                if (in_array('cuenta_bancaria_id', $formFields, true)) {
+                    $cuentasStmt = Database::connection()->query('SELECT id, banco, tipo_cuenta, numero_cuenta, titular FROM cuentas_bancarias WHERE activa = 1 ORDER BY banco ASC, numero_cuenta ASC');
+                    $formMeta['options']['cuenta_bancaria_id'] = array_map(static function (array $item): array {
+                        $banco = trim((string) ($item['banco'] ?? ''));
+                        $tipo = trim((string) ($item['tipo_cuenta'] ?? ''));
+                        $numero = trim((string) ($item['numero_cuenta'] ?? ''));
+                        $titular = trim((string) ($item['titular'] ?? ''));
+                        $label = implode(' · ', array_filter([$banco, $tipo, $numero !== '' ? ('N° ' . $numero) : '', $titular]));
+                        if ($label === '') {
+                            $label = 'Cuenta #' . (string) ($item['id'] ?? '');
+                        }
+
+                        return [
+                            'value' => (string) ($item['id'] ?? ''),
+                            'label' => $label,
+                        ];
+                    }, $cuentasStmt->fetchAll());
+                }
+
+                if ($currentRecord === null) {
+                    $currentRecord = [
+                        'fecha' => date('Y-m-d'),
+                        'tipo_movimiento' => 'ingreso',
+                        'ingreso' => '',
+                        'egreso' => '',
+                    ];
+                }
+
+                $visibleColumns = array_values(array_intersect([
+                    'id',
+                    'fecha',
+                    'tipo_movimiento',
+                    'origen_modulo',
+                    'descripcion',
+                    'ingreso',
+                    'egreso',
+                    'saldo_referencial',
+                ], $data['columns']['all']));
+            }
+
 
             $flashSuccess = $_SESSION['flash_success'] ?? null;
             $flashError = $_SESSION['flash_error'] ?? null;
