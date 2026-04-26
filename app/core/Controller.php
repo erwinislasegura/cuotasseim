@@ -226,6 +226,13 @@ abstract class Controller
                         ['value' => 'trimestre_actual', 'label' => 'Trimestre actual'],
                         ['value' => 'anio_actual', 'label' => 'Año actual'],
                     ],
+                    'origenes' => [
+                        ['value' => '', 'label' => 'Todos los movimientos'],
+                        ['value' => 'pago_cuotas', 'label' => 'Pago de cuotas'],
+                        ['value' => 'aporte', 'label' => 'Aporte'],
+                        ['value' => 'retiro', 'label' => 'Retiro'],
+                        ['value' => 'manual', 'label' => 'Manual / ajuste'],
+                    ],
                     'socios' => array_map(static function (array $item): array {
                         $nombre = trim((string) ($item['nombre_completo'] ?? ''));
                         $rut = trim((string) ($item['rut'] ?? ''));
