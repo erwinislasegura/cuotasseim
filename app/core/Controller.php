@@ -1097,18 +1097,101 @@ abstract class Controller
         $perPage = 10;
 
         $params = [];
-        $whereSql = 'WHERE 1=1';
+        $dateWherePagos = '';
+        $dateWhereAportes = '';
+        $dateWhereEgresos = '';
+        $dateWhereTesoreria = '';
 
         if ($from !== '') {
-            $whereSql .= ' AND DATE(mt.fecha) >= :from_date';
-            $params[':from_date'] = $from;
+            $dateWherePagos .= ' AND DATE(p.fecha_pago) >= :from_date_pagos';
+            $dateWhereAportes .= ' AND DATE(a.fecha_aporte) >= :from_date_aportes';
+            $dateWhereEgresos .= ' AND DATE(e.fecha) >= :from_date_egresos';
+            $dateWhereTesoreria .= ' AND DATE(mt.fecha) >= :from_date_mt';
+            $params[':from_date_pagos'] = $from;
+            $params[':from_date_aportes'] = $from;
+            $params[':from_date_egresos'] = $from;
+            $params[':from_date_mt'] = $from;
         }
         if ($to !== '') {
-            $whereSql .= ' AND DATE(mt.fecha) <= :to_date';
-            $params[':to_date'] = $to;
+            $dateWherePagos .= ' AND DATE(p.fecha_pago) <= :to_date_pagos';
+            $dateWhereAportes .= ' AND DATE(a.fecha_aporte) <= :to_date_aportes';
+            $dateWhereEgresos .= ' AND DATE(e.fecha) <= :to_date_egresos';
+            $dateWhereTesoreria .= ' AND DATE(mt.fecha) <= :to_date_mt';
+            $params[':to_date_pagos'] = $to;
+            $params[':to_date_aportes'] = $to;
+            $params[':to_date_egresos'] = $to;
+            $params[':to_date_mt'] = $to;
         }
 
         $sql = "
+            SELECT
+                CONCAT('P-', p.id) AS row_id,
+                p.id,
+                p.fecha_pago AS fecha,
+                'ingreso' AS tipo_movimiento,
+                'pagos' AS origen_modulo,
+                p.id AS referencia_id,
+                CONCAT('Pago cuota ', COALESCE(p.numero_comprobante, CONCAT('#', p.id)), ' · ', COALESCE(s.nombre_completo, 'Socio')) AS descripcion,
+                COALESCE(p.monto_total, 0) AS ingreso,
+                0 AS egreso,
+                COALESCE(mt.saldo_referencial, 0) AS saldo_referencial,
+                COALESCE(s.id, 0) AS socio_id,
+                COALESCE(s.rut, '') AS socio_rut,
+                COALESCE(s.nombre_completo, '') AS socio_nombre,
+                COALESCE(up.nombre, up.usuario, CONCAT('Usuario #', COALESCE(up.id, 0)), 'Sistema') AS usuario_registro
+            FROM pagos p
+            INNER JOIN socios s ON s.id = p.socio_id
+            LEFT JOIN usuarios up ON up.id = p.usuario_id
+            LEFT JOIN movimientos_tesoreria mt ON mt.origen_modulo = 'pagos' AND mt.referencia_id = p.id
+            WHERE p.deleted_at IS NULL AND p.estado_pago <> 'anulado' {$dateWherePagos}
+
+            UNION ALL
+
+            SELECT
+                CONCAT('A-', a.id) AS row_id,
+                a.id,
+                a.fecha_aporte AS fecha,
+                'ingreso' AS tipo_movimiento,
+                'aportes' AS origen_modulo,
+                a.id AS referencia_id,
+                CONCAT('Aporte ', COALESCE(a.comentario, a.descripcion, ''), ' · ', COALESCE(s.nombre_completo, a.nombre_aportante, 'Aportante')) AS descripcion,
+                COALESCE(a.monto, 0) AS ingreso,
+                0 AS egreso,
+                COALESCE(mt.saldo_referencial, 0) AS saldo_referencial,
+                COALESCE(s.id, 0) AS socio_id,
+                COALESCE(s.rut, '') AS socio_rut,
+                COALESCE(s.nombre_completo, a.nombre_aportante, '') AS socio_nombre,
+                COALESCE(ua.nombre, ua.usuario, CONCAT('Usuario #', COALESCE(ua.id, 0)), 'Sistema') AS usuario_registro
+            FROM aportes a
+            LEFT JOIN socios s ON s.id = a.socio_id
+            LEFT JOIN usuarios ua ON ua.id = a.usuario_id
+            LEFT JOIN movimientos_tesoreria mt ON mt.origen_modulo = 'aportes' AND mt.referencia_id = a.id
+            WHERE a.estado <> 'anulado' {$dateWhereAportes}
+
+            UNION ALL
+
+            SELECT
+                CONCAT('E-', e.id) AS row_id,
+                e.id,
+                e.fecha AS fecha,
+                'egreso' AS tipo_movimiento,
+                'egresos' AS origen_modulo,
+                e.id AS referencia_id,
+                CONCAT('Retiro ', COALESCE(e.numero_documento, CONCAT('#', e.id)), ' · ', COALESCE(e.proveedor_destinatario, ''), ' · ', COALESCE(e.descripcion, '')) AS descripcion,
+                0 AS ingreso,
+                COALESCE(e.monto, 0) AS egreso,
+                COALESCE(mt.saldo_referencial, 0) AS saldo_referencial,
+                0 AS socio_id,
+                '' AS socio_rut,
+                COALESCE(e.proveedor_destinatario, '') AS socio_nombre,
+                COALESCE(ue.nombre, ue.usuario, CONCAT('Usuario #', COALESCE(ue.id, 0)), 'Sistema') AS usuario_registro
+            FROM egresos e
+            LEFT JOIN usuarios ue ON ue.id = e.usuario_id
+            LEFT JOIN movimientos_tesoreria mt ON mt.origen_modulo = 'egresos' AND mt.referencia_id = e.id
+            WHERE e.deleted_at IS NULL AND e.estado <> 'anulado' {$dateWhereEgresos}
+
+            UNION ALL
+
             SELECT
                 CONCAT('MT-', mt.id) AS row_id,
                 mt.id,
@@ -1120,29 +1203,20 @@ abstract class Controller
                 COALESCE(mt.ingreso, 0) AS ingreso,
                 COALESCE(mt.egreso, 0) AS egreso,
                 COALESCE(mt.saldo_referencial, 0) AS saldo_referencial,
-                COALESCE(s.id, 0) AS socio_id,
-                COALESCE(s.rut, '') AS socio_rut,
-                COALESCE(s.nombre_completo, '') AS socio_nombre,
-                COALESCE(u.nombre, u.usuario, CONCAT('Usuario #', COALESCE(u.id, 0)), 'Sistema') AS usuario_registro
+                0 AS socio_id,
+                '' AS socio_rut,
+                '' AS socio_nombre,
+                'Sistema / Ajuste manual' AS usuario_registro
             FROM movimientos_tesoreria mt
-            LEFT JOIN pagos p
-              ON mt.origen_modulo = 'pagos'
-             AND mt.referencia_id = p.id
-            LEFT JOIN aportes a
-              ON mt.origen_modulo = 'aportes'
-             AND mt.referencia_id = a.id
-            LEFT JOIN egresos e
-              ON mt.origen_modulo = 'egresos'
-             AND mt.referencia_id = e.id
-            LEFT JOIN socios s
-              ON s.id = CASE
-                  WHEN mt.origen_modulo = 'pagos' THEN p.socio_id
-                  WHEN mt.origen_modulo = 'aportes' THEN a.socio_id
-                  ELSE NULL
-              END
-            LEFT JOIN usuarios u
-              ON u.id = COALESCE(p.usuario_id, a.usuario_id, e.usuario_id)
-            {$whereSql}
+            LEFT JOIN pagos p ON mt.origen_modulo = 'pagos' AND mt.referencia_id = p.id
+            LEFT JOIN aportes a ON mt.origen_modulo = 'aportes' AND mt.referencia_id = a.id
+            LEFT JOIN egresos e ON mt.origen_modulo = 'egresos' AND mt.referencia_id = e.id
+            WHERE (
+                mt.origen_modulo NOT IN ('pagos', 'aportes', 'egresos')
+                OR (mt.origen_modulo = 'pagos' AND p.id IS NULL)
+                OR (mt.origen_modulo = 'aportes' AND a.id IS NULL)
+                OR (mt.origen_modulo = 'egresos' AND e.id IS NULL)
+            ) {$dateWhereTesoreria}
         ";
 
         $stmt = $db->prepare($sql);
