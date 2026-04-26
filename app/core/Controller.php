@@ -35,6 +35,10 @@ abstract class Controller
 
         Session::start();
 
+        if (($config['route'] ?? '') === 'auditoria') {
+            ModuleCatalog::bootstrapAuditIfEmpty();
+        }
+
         $query = trim((string) ($_GET['q'] ?? ''));
         $status = trim((string) ($_GET['status'] ?? ''));
         $from = trim((string) ($_GET['from'] ?? ''));

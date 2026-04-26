@@ -677,6 +677,83 @@ class ModuleCatalog
         }
     }
 
+    public static function bootstrapAuditIfEmpty(): void
+    {
+        if (!self::tableExists('auditoria')) {
+            return;
+        }
+
+        $db = Database::connection();
+        $excluded = ['auditoria', 'migrations'];
+        $tablesStmt = $db->query('SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()');
+        $tables = array_map(static fn(array $row): string => (string) ($row['table_name'] ?? ''), $tablesStmt->fetchAll());
+
+        foreach ($tables as $table) {
+            if ($table === '' || in_array($table, $excluded, true)) {
+                continue;
+            }
+            if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
+                continue;
+            }
+
+            $meta = self::resolveColumns($db, $table);
+            $primaryKey = (string) ($meta['primary'] ?? 'id');
+            $allColumns = $meta['all'] ?? [];
+            if (!in_array($primaryKey, $allColumns, true)) {
+                continue;
+            }
+
+            $userColumn = null;
+            foreach (['usuario_id', 'user_id', 'created_by'] as $candidate) {
+                if (in_array($candidate, $allColumns, true)) {
+                    $userColumn = $candidate;
+                    break;
+                }
+            }
+
+            $dateColumn = null;
+            foreach (['created_at', 'fecha', 'fecha_pago', 'fecha_aporte', 'updated_at'] as $candidate) {
+                if (in_array($candidate, $allColumns, true)) {
+                    $dateColumn = $candidate;
+                    break;
+                }
+            }
+
+            $usuarioExpr = $userColumn !== null
+                ? "(SELECT u.id FROM usuarios u WHERE u.id = t.`{$userColumn}` LIMIT 1)"
+                : 'NULL';
+            $fechaExpr = $dateColumn !== null ? "COALESCE(t.`{$dateColumn}`, NOW())" : 'NOW()';
+            $deletedWhere = in_array('deleted_at', $allColumns, true) ? ' AND t.`deleted_at` IS NULL' : '';
+
+            $sql = "
+                INSERT INTO auditoria (usuario_id, modulo, accion, id_registro, datos_nuevos, fecha, ip, user_agent)
+                SELECT
+                    {$usuarioExpr},
+                    :modulo,
+                    'registro_detectado',
+                    t.`{$primaryKey}`,
+                    JSON_OBJECT('tabla', :modulo, 'registro_id', t.`{$primaryKey}`),
+                    {$fechaExpr},
+                    NULL,
+                    'bootstrap_sync'
+                FROM `{$table}` t
+                LEFT JOIN auditoria a
+                    ON a.modulo = :modulo
+                   AND a.accion = 'registro_detectado'
+                   AND a.id_registro = t.`{$primaryKey}`
+                WHERE a.id IS NULL {$deletedWhere}
+            ";
+
+            $stmt = $db->prepare($sql);
+            $stmt->bindValue(':modulo', $table);
+            try {
+                $stmt->execute();
+            } catch (\Throwable $exception) {
+                // Continúa con el siguiente módulo si alguno falla.
+            }
+        }
+    }
+
     public static function delete(string $table, string $primaryKey, int $id, bool $softDelete): void
     {
         if ($softDelete) {
