@@ -149,7 +149,7 @@ abstract class Controller
             if (($_GET['export'] ?? '') === 'excel') {
                 ModuleCatalog::exportCsv(
                     'reportes_' . date('Ymd_His') . '.csv',
-                    ['row_id', 'fecha', 'tipo_movimiento', 'origen_modulo', 'referencia_id', 'socio_nombre', 'socio_rut', 'descripcion', 'ingreso', 'egreso', 'saldo_referencial', 'usuario_registro'],
+                    ['row_id', 'fecha', 'tipo_movimiento', 'origen_modulo', 'referencia_id', 'socio_nombre', 'socio_rut', 'periodo_a_pagar', 'descripcion', 'ingreso', 'egreso', 'saldo_referencial', 'usuario_registro'],
                     $rendicionesResult['filtered_rows']
                 );
                 return;
@@ -226,6 +226,13 @@ abstract class Controller
                         ['value' => 'trimestre_actual', 'label' => 'Trimestre actual'],
                         ['value' => 'anio_actual', 'label' => 'Año actual'],
                     ],
+                    'origenes' => [
+                        ['value' => '', 'label' => 'Todos los movimientos'],
+                        ['value' => 'pago_cuotas', 'label' => 'Pago de cuotas'],
+                        ['value' => 'aporte', 'label' => 'Aporte'],
+                        ['value' => 'retiro', 'label' => 'Retiro'],
+                        ['value' => 'manual', 'label' => 'Manual / ajuste'],
+                    ],
                     'socios' => array_map(static function (array $item): array {
                         $nombre = trim((string) ($item['nombre_completo'] ?? ''));
                         $rut = trim((string) ($item['rut'] ?? ''));
@@ -265,7 +272,7 @@ abstract class Controller
                     $row['descripcion'] = $descripcion;
                     return $row;
                 }, $rendicionesResult['rows']),
-                'columns' => ['row_id', 'fecha', 'tipo_movimiento', 'origen_modulo', 'referencia_id', 'socio_nombre', 'socio_rut', 'descripcion', 'ingreso', 'egreso', 'saldo_referencial', 'usuario_registro'],
+                'columns' => ['row_id', 'fecha', 'tipo_movimiento', 'origen_modulo', 'referencia_id', 'socio_nombre', 'socio_rut', 'periodo_a_pagar', 'descripcion', 'ingreso', 'egreso', 'saldo_referencial', 'usuario_registro'],
                 'formFields' => [],
                 'statusField' => 'tipo_movimiento',
                 'statusCounts' => $rendicionesResult['status_counts'],
@@ -297,6 +304,7 @@ abstract class Controller
                     'referencia_id' => 'Referencia',
                     'socio_nombre' => 'Socio / Titular',
                     'socio_rut' => 'RUT',
+                    'periodo_a_pagar' => 'Periodo a pagar',
                     'descripcion' => 'Descripción',
                     'ingreso' => 'Ingreso',
                     'egreso' => 'Egreso',
@@ -914,6 +922,7 @@ abstract class Controller
                     'referencia_id' => 'Referencia',
                     'socio_nombre' => 'Socio / Titular',
                     'socio_rut' => 'RUT',
+                    'periodo_a_pagar' => 'Periodo a pagar',
                     'descripcion' => 'Descripción',
                     'ingreso' => 'Ingreso',
                     'egreso' => 'Egreso',
@@ -928,6 +937,7 @@ abstract class Controller
                     'referencia_id',
                     'socio_nombre',
                     'socio_rut',
+                    'periodo_a_pagar',
                     'descripcion',
                     'ingreso',
                     'egreso',
@@ -1215,17 +1225,89 @@ abstract class Controller
                 'ingreso' AS tipo_movimiento,
                 'Pago de cuotas' AS origen_modulo,
                 p.id AS referencia_id,
-                CONCAT('Pago cuota ', COALESCE(p.numero_comprobante, CONCAT('#', p.id)), ' · ', COALESCE(s.nombre_completo, 'Socio')) AS descripcion,
+                CONCAT(
+                    'Pago cuota ',
+                    COALESCE(p.numero_comprobante, CONCAT('#', p.id)),
+                    ' · ',
+                    COALESCE(s.nombre_completo, 'Socio'),
+                    CASE
+                        WHEN COALESCE(NULLIF(TRIM(p.periodo_a_pagar), ''), periodos_pago.periodo_a_pagar, '') <> ''
+                            THEN CONCAT(' · Periodo: ', COALESCE(NULLIF(TRIM(p.periodo_a_pagar), ''), periodos_pago.periodo_a_pagar))
+                        ELSE ''
+                    END
+                ) AS descripcion,
                 COALESCE(p.monto_total, 0) AS ingreso,
                 0 AS egreso,
                 COALESCE(mt.saldo_referencial, 0) AS saldo_referencial,
                 COALESCE(s.id, 0) AS socio_id,
                 COALESCE(s.rut, '') AS socio_rut,
                 COALESCE(s.nombre_completo, '') AS socio_nombre,
+                COALESCE(NULLIF(TRIM(p.periodo_a_pagar), ''), periodos_pago.periodo_a_pagar, '') AS periodo_a_pagar,
                 COALESCE(up.nombre, up.usuario, CONCAT('Usuario #', COALESCE(up.id, 0)), 'Sistema') AS usuario_registro
             FROM pagos p
             INNER JOIN socios s ON s.id = p.socio_id
             LEFT JOIN usuarios up ON up.id = p.usuario_id
+            LEFT JOIN (
+                SELECT
+                    pd.pago_id,
+                    GROUP_CONCAT(
+                        DISTINCT TRIM(
+                            CASE
+                                WHEN COALESCE(pe.tipo_periodo, 'mensual') = 'mensual' THEN CONCAT(
+                                    'Mes ',
+                                    ELT(
+                                        COALESCE(pe.mes, MONTH(pe.fecha_inicio), MONTH(c.fecha_vencimiento), 1),
+                                        'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                                        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+                                    ),
+                                    ' ',
+                                    COALESCE(pe.anio, YEAR(pe.fecha_inicio), YEAR(c.fecha_vencimiento), YEAR(CURDATE()))
+                                )
+                                WHEN COALESCE(pe.tipo_periodo, '') = 'trimestral' THEN CONCAT(
+                                    'Trimestre ',
+                                    ELT(
+                                        CEIL(COALESCE(pe.mes, MONTH(pe.fecha_inicio), MONTH(c.fecha_vencimiento), 1) / 3),
+                                        'uno', 'dos', 'tres', 'cuatro'
+                                    ),
+                                    ' ',
+                                    COALESCE(pe.anio, YEAR(pe.fecha_inicio), YEAR(c.fecha_vencimiento), YEAR(CURDATE()))
+                                )
+                                WHEN COALESCE(pe.tipo_periodo, '') = 'semestral' THEN CONCAT(
+                                    'Semestre ',
+                                    ELT(
+                                        CASE
+                                            WHEN COALESCE(pe.mes, MONTH(pe.fecha_inicio), MONTH(c.fecha_vencimiento), 1) <= 6 THEN 1
+                                            ELSE 2
+                                        END,
+                                        'uno',
+                                        'dos'
+                                    ),
+                                    ' ',
+                                    COALESCE(pe.anio, YEAR(pe.fecha_inicio), YEAR(c.fecha_vencimiento), YEAR(CURDATE()))
+                                )
+                                WHEN COALESCE(pe.tipo_periodo, '') = 'anual' THEN CONCAT(
+                                    'Año ',
+                                    COALESCE(pe.anio, YEAR(pe.fecha_inicio), YEAR(c.fecha_vencimiento), YEAR(CURDATE()))
+                                )
+                                ELSE TRIM(
+                                    CONCAT(
+                                        COALESCE(pe.nombre_periodo, ''),
+                                        CASE
+                                            WHEN pe.anio IS NOT NULL THEN CONCAT(' ', pe.anio)
+                                            ELSE ''
+                                        END
+                                    )
+                                )
+                            END
+                        )
+                        ORDER BY pe.anio DESC, pe.mes DESC
+                        SEPARATOR ', '
+                    ) AS periodo_a_pagar
+                FROM pago_detalle pd
+                INNER JOIN cuotas c ON c.id = pd.cuota_id
+                LEFT JOIN periodos pe ON pe.id = c.periodo_id
+                GROUP BY pd.pago_id
+            ) periodos_pago ON periodos_pago.pago_id = p.id
             LEFT JOIN movimientos_tesoreria mt ON mt.origen_modulo = 'pagos' AND mt.referencia_id = p.id
             WHERE p.deleted_at IS NULL AND p.estado_pago <> 'anulado' {$dateWherePagos}
 
@@ -1245,6 +1327,7 @@ abstract class Controller
                 COALESCE(s.id, 0) AS socio_id,
                 COALESCE(s.rut, '') AS socio_rut,
                 COALESCE(s.nombre_completo, a.nombre_aportante, '') AS socio_nombre,
+                '' AS periodo_a_pagar,
                 COALESCE(ua.nombre, ua.usuario, CONCAT('Usuario #', COALESCE(ua.id, 0)), 'Sistema') AS usuario_registro
             FROM aportes a
             LEFT JOIN socios s ON s.id = a.socio_id
@@ -1268,6 +1351,7 @@ abstract class Controller
                 0 AS socio_id,
                 '' AS socio_rut,
                 COALESCE(e.proveedor_destinatario, '') AS socio_nombre,
+                '' AS periodo_a_pagar,
                 COALESCE(ue.nombre, ue.usuario, CONCAT('Usuario #', COALESCE(ue.id, 0)), 'Sistema') AS usuario_registro
             FROM egresos e
             LEFT JOIN usuarios ue ON ue.id = e.usuario_id
@@ -1300,6 +1384,7 @@ abstract class Controller
                 0 AS socio_id,
                 '' AS socio_rut,
                 '' AS socio_nombre,
+                '' AS periodo_a_pagar,
                 'Sistema / Ajuste manual' AS usuario_registro
             FROM movimientos_tesoreria mt
             LEFT JOIN pagos p ON mt.origen_modulo = 'pagos' AND mt.referencia_id = p.id
@@ -1386,7 +1471,7 @@ abstract class Controller
             }
 
             if ($queryLower !== '') {
-                $haystack = mb_strtolower(trim((string) (($row['descripcion'] ?? '') . ' ' . ($row['origen_modulo'] ?? '') . ' ' . ($row['socio_nombre'] ?? '') . ' ' . ($row['socio_rut'] ?? '') . ' ' . ($row['usuario_registro'] ?? ''))));
+                $haystack = mb_strtolower(trim((string) (($row['descripcion'] ?? '') . ' ' . ($row['periodo_a_pagar'] ?? '') . ' ' . ($row['origen_modulo'] ?? '') . ' ' . ($row['socio_nombre'] ?? '') . ' ' . ($row['socio_rut'] ?? '') . ' ' . ($row['usuario_registro'] ?? ''))));
                 if (!str_contains($haystack, $queryLower)) {
                     return false;
                 }
