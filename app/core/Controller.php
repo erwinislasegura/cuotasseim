@@ -318,6 +318,10 @@ abstract class Controller
         }
 
         try {
+            if (($config['table'] ?? '') === 'configuracion') {
+                $this->ensureFlowConfigColumns();
+            }
+
             $data = ModuleCatalog::fetchData(
                 $config,
                 $query,
@@ -343,6 +347,11 @@ abstract class Controller
 
                 if (!$isReadOnly && $action === 'save') {
                     if (($config['route'] ?? '') === 'configuracion') {
+                        if (($id ?? 0) <= 0) {
+                            $stmtConfigId = Database::connection()->query('SELECT id FROM configuracion ORDER BY id ASC LIMIT 1');
+                            $id = (int) ($stmtConfigId->fetchColumn() ?: 0);
+                        }
+
                         $removeLogo = (string) ($_POST['eliminar_logo'] ?? '') === '1';
                         if ($removeLogo) {
                             $_POST['logo'] = '';
@@ -546,6 +555,10 @@ abstract class Controller
                 $viewRecordDisplay = ModuleCatalog::decorateRecordForDisplay($config['table'], $viewRecord);
             }
 
+            if ($config['table'] === 'configuracion' && $currentRecord === null) {
+                $stmtConfigActual = Database::connection()->query('SELECT * FROM configuracion ORDER BY id ASC LIMIT 1');
+                $currentRecord = $stmtConfigActual->fetch() ?: null;
+            }
 
             if ($config['table'] === 'periodos') {
                 $formFields = array_values(array_intersect([
@@ -584,38 +597,48 @@ abstract class Controller
             }
 
             if ($config['table'] === 'configuracion') {
-                $formFields = array_values(array_filter($data['columns']['form'], static fn(string $field): bool => $field !== 'logo'));
+                $formFields = array_values(array_intersect([
+                    'nombre_organizacion',
+                    'nombre_sistema',
+                    'rut_organizacion',
+                    'direccion',
+                    'telefono',
+                    'correo',
+                    'sitio_web',
+                    'flow_api_key',
+                    'flow_secret_key',
+                    'flow_modo_sandbox',
+                ], $data['columns']['form']));
                 $formMeta = [
                     'types' => [
                         'correo' => 'email',
                         'sitio_web' => 'url',
-                        'texto_comprobante' => 'textarea',
-                        'observaciones_generales' => 'textarea',
-                        'cuota_por_defecto' => 'number',
+                        'flow_modo_sandbox' => 'select',
+                    ],
+                    'options' => [
+                        'flow_modo_sandbox' => [
+                            ['value' => '1', 'label' => 'Sí (Sandbox)'],
+                            ['value' => '0', 'label' => 'No (Producción)'],
+                        ],
                     ],
                     'labels' => [
-                        'nombre_organizacion' => 'Organización',
-                        'nombre_sistema' => 'Nombre del sistema',
-                        'rut_organizacion' => 'RUT',
+                        'nombre_organizacion' => 'Nombre institución',
+                        'nombre_sistema' => 'Nombre sistema',
+                        'rut_organizacion' => 'RUT institución',
                         'direccion' => 'Dirección',
                         'telefono' => 'Teléfono',
                         'correo' => 'Correo',
                         'sitio_web' => 'Sitio web',
-                        'cuota_por_defecto' => 'Cuota por defecto',
-                        'moneda' => 'Moneda',
-                        'simbolo_moneda' => 'Símbolo',
-                        'texto_comprobante' => 'Texto en comprobante',
-                        'observaciones_generales' => 'Observaciones',
                         'logo' => 'Logo institucional',
-                    ],
-                    'attributes' => [
-                        'cuota_por_defecto' => ['step' => '0.01', 'min' => '0'],
+                        'flow_api_key' => 'Flow Api Key',
+                        'flow_secret_key' => 'Flow Secret Key',
+                        'flow_modo_sandbox' => 'Flow Modo Sandbox',
                     ],
                 ];
                 $columnLabels = $formMeta['labels'];
             }
 
-            if ($config['table'] === 'socios') {
+                                    if ($config['table'] === 'socios') {
                 $availableFormFields = array_values(array_intersect([
                     'numero_socio',
                     'rut',
@@ -1181,6 +1204,30 @@ abstract class Controller
                 'extraFilters' => [],
                 'extraQueryParams' => [],
             ]);
+        }
+    }
+
+
+    private function ensureFlowConfigColumns(): void
+    {
+        $db = Database::connection();
+
+        $required = [
+            'flow_api_key' => "ALTER TABLE configuracion ADD COLUMN flow_api_key VARCHAR(120) NULL AFTER sitio_web",
+            'flow_secret_key' => "ALTER TABLE configuracion ADD COLUMN flow_secret_key VARCHAR(140) NULL AFTER flow_api_key",
+            'flow_modo_sandbox' => "ALTER TABLE configuracion ADD COLUMN flow_modo_sandbox TINYINT(1) NOT NULL DEFAULT 1 AFTER flow_secret_key",
+        ];
+
+        foreach ($required as $column => $sql) {
+            $stmt = $db->prepare('SHOW COLUMNS FROM configuracion LIKE :column_name');
+            $stmt->bindValue(':column_name', $column);
+            $stmt->execute();
+            $exists = $stmt->fetch();
+            if ($exists) {
+                continue;
+            }
+
+            $db->exec($sql);
         }
     }
 
