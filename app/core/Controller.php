@@ -1210,24 +1210,32 @@ abstract class Controller
 
     private function ensureFlowConfigColumns(): void
     {
-        $db = Database::connection();
+        try {
+            $db = Database::connection();
 
-        $required = [
-            'flow_api_key' => "ALTER TABLE configuracion ADD COLUMN flow_api_key VARCHAR(120) NULL AFTER sitio_web",
-            'flow_secret_key' => "ALTER TABLE configuracion ADD COLUMN flow_secret_key VARCHAR(140) NULL AFTER flow_api_key",
-            'flow_modo_sandbox' => "ALTER TABLE configuracion ADD COLUMN flow_modo_sandbox TINYINT(1) NOT NULL DEFAULT 1 AFTER flow_secret_key",
-        ];
+            $required = [
+                'flow_api_key' => "ALTER TABLE configuracion ADD COLUMN flow_api_key VARCHAR(120) NULL AFTER sitio_web",
+                'flow_secret_key' => "ALTER TABLE configuracion ADD COLUMN flow_secret_key VARCHAR(140) NULL AFTER flow_api_key",
+                'flow_modo_sandbox' => "ALTER TABLE configuracion ADD COLUMN flow_modo_sandbox TINYINT(1) NOT NULL DEFAULT 1 AFTER flow_secret_key",
+            ];
 
-        foreach ($required as $column => $sql) {
-            $stmt = $db->prepare('SHOW COLUMNS FROM configuracion LIKE :column_name');
-            $stmt->bindValue(':column_name', $column);
-            $stmt->execute();
-            $exists = $stmt->fetch();
-            if ($exists) {
-                continue;
+            foreach ($required as $column => $sql) {
+                $stmt = $db->prepare('SHOW COLUMNS FROM configuracion LIKE :column_name');
+                $stmt->bindValue(':column_name', $column);
+                $stmt->execute();
+                $exists = $stmt->fetch();
+                if ($exists) {
+                    continue;
+                }
+
+                try {
+                    $db->exec($sql);
+                } catch (\Throwable) {
+                    // Sin permisos ALTER o motor restringido: no bloquear la carga del módulo.
+                }
             }
-
-            $db->exec($sql);
+        } catch (\Throwable) {
+            // Evita romper /configuracion por validaciones de esquema.
         }
     }
 
