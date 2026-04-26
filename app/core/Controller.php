@@ -147,7 +147,7 @@ abstract class Controller
             if (($_GET['export'] ?? '') === 'excel') {
                 ModuleCatalog::exportCsv(
                     'reportes_' . date('Ymd_His') . '.csv',
-                    ['fecha', 'tipo_movimiento', 'origen_modulo', 'descripcion', 'ingreso', 'egreso', 'saldo_referencial', 'usuario_registro'],
+                    ['row_id', 'fecha', 'tipo_movimiento', 'origen_modulo', 'referencia_id', 'socio_nombre', 'socio_rut', 'descripcion', 'ingreso', 'egreso', 'saldo_referencial', 'usuario_registro'],
                     $rendicionesResult['filtered_rows']
                 );
                 return;
@@ -258,7 +258,7 @@ abstract class Controller
                     $row['saldo_referencial'] = '$' . number_format((float) ($row['saldo_referencial'] ?? 0), 0, ',', '.');
                     return $row;
                 }, $rendicionesResult['rows']),
-                'columns' => ['fecha', 'tipo_movimiento', 'origen_modulo', 'referencia_id', 'descripcion', 'ingreso', 'egreso', 'saldo_referencial', 'usuario_registro'],
+                'columns' => ['row_id', 'fecha', 'tipo_movimiento', 'origen_modulo', 'referencia_id', 'socio_nombre', 'socio_rut', 'descripcion', 'ingreso', 'egreso', 'saldo_referencial', 'usuario_registro'],
                 'formFields' => [],
                 'statusField' => 'tipo_movimiento',
                 'statusCounts' => $rendicionesResult['status_counts'],
@@ -284,9 +284,12 @@ abstract class Controller
                 'formMeta' => $formMeta,
                 'columnLabels' => [
                     'fecha' => 'Fecha',
+                    'row_id' => '# Movimiento',
                     'tipo_movimiento' => 'Tipo',
                     'origen_modulo' => 'Origen',
                     'referencia_id' => 'Referencia',
+                    'socio_nombre' => 'Socio / Titular',
+                    'socio_rut' => 'RUT',
                     'descripcion' => 'Descripción',
                     'ingreso' => 'Ingreso',
                     'egreso' => 'Egreso',
@@ -897,10 +900,13 @@ abstract class Controller
                 $socios = $sociosStmt->fetchAll();
 
                 $columnLabels = [
+                    'row_id' => '# Movimiento',
                     'fecha' => 'Fecha',
                     'tipo_movimiento' => 'Tipo',
                     'origen_modulo' => 'Origen',
                     'referencia_id' => 'Referencia',
+                    'socio_nombre' => 'Socio / Titular',
+                    'socio_rut' => 'RUT',
                     'descripcion' => 'Descripción',
                     'ingreso' => 'Ingreso',
                     'egreso' => 'Egreso',
@@ -908,10 +914,13 @@ abstract class Controller
                     'usuario_registro' => 'Registrado por',
                 ];
                 $visibleColumns = array_values(array_intersect([
+                    'row_id',
                     'fecha',
                     'tipo_movimiento',
                     'origen_modulo',
                     'referencia_id',
+                    'socio_nombre',
+                    'socio_rut',
                     'descripcion',
                     'ingreso',
                     'egreso',

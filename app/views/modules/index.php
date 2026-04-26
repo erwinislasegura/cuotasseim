@@ -20,6 +20,7 @@ $statusOptions = [
 ];
 
 $isPaymentHistory = ($route ?? '') === 'pagos';
+$showTableActions = ($route ?? '') !== 'reportes';
 $extraFilters = is_array($extraFilters ?? null) ? $extraFilters : [];
 $extraQueryParams = is_array($extraQueryParams ?? null) ? $extraQueryParams : [];
 $exportQueryParams = array_merge([
@@ -669,12 +670,14 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
               <?php $columnLabel = (string) (($columnLabels[$column] ?? ucwords(str_replace('_', ' ', (string) $column)))); ?>
               <th><?= htmlspecialchars($columnLabel) ?></th>
             <?php endforeach; ?>
-            <th class="text-end">Acciones</th>
+            <?php if ($showTableActions): ?>
+              <th class="text-end">Acciones</th>
+            <?php endif; ?>
           </tr>
         </thead>
         <tbody>
           <?php if (empty($rows ?? [])): ?>
-            <tr><td colspan="<?= (int) (count($columns ?? []) + 2) ?>" class="empty-state">Sin registros para mostrar con los filtros aplicados.</td></tr>
+            <tr><td colspan="<?= (int) (count($columns ?? []) + ($showTableActions ? 2 : 1)) ?>" class="empty-state">Sin registros para mostrar con los filtros aplicados.</td></tr>
           <?php else: ?>
             <?php foreach (($rows ?? []) as $index => $row): ?>
               <?php $displayRow = $displayRows[$index] ?? $row; ?>
@@ -698,6 +701,7 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
                     <?php endif; ?>
                   </td>
                 <?php endforeach; ?>
+                <?php if ($showTableActions): ?>
                 <td class="text-end">
                   <?php
                     $recordDetails = [];
@@ -787,6 +791,7 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
                     </ul>
                   </div>
                 </td>
+                <?php endif; ?>
               </tr>
             <?php endforeach; ?>
           <?php endif; ?>
@@ -799,7 +804,7 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
           ?>
           <tfoot>
             <tr class="table-light fw-semibold">
-              <td colspan="5" class="text-end">Totales (según filtros)</td>
+              <td colspan="<?= (int) max(1, count($columns ?? []) - 3) ?>" class="text-end">Totales (según filtros)</td>
               <td class="text-end">$<?= number_format($totalIngresosTabla, 0, ',', '.') ?></td>
               <td class="text-end">$<?= number_format($totalEgresosTabla, 0, ',', '.') ?></td>
               <td class="text-end" style="color:<?= $balanceTabla >= 0 ? '#15803d' : '#b91c1c' ?>">
