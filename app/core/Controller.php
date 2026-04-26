@@ -318,6 +318,8 @@ abstract class Controller
         }
 
         try {
+            $this->ensureSchemaTables();
+
             if (($config['table'] ?? '') === 'configuracion') {
                 $this->ensureFlowConfigColumns();
             }
@@ -1213,6 +1215,51 @@ abstract class Controller
                 'extraFilters' => [],
                 'extraQueryParams' => [],
             ]);
+        }
+    }
+
+    private function ensureSchemaTables(): void
+    {
+        static $schemaChecked = false;
+        if ($schemaChecked) {
+            return;
+        }
+
+        $schemaChecked = true;
+
+        try {
+            $schemaFile = dirname(__DIR__, 2) . '/database/schema.sql';
+            if (!is_file($schemaFile)) {
+                return;
+            }
+
+            $sqlContent = (string) file_get_contents($schemaFile);
+            if ($sqlContent === '') {
+                return;
+            }
+
+            $db = Database::connection();
+            $statements = array_filter(array_map('trim', explode(';', $sqlContent)));
+
+            foreach ($statements as $statement) {
+                $normalized = strtoupper(ltrim($statement));
+                if (!str_starts_with($normalized, 'CREATE TABLE ')) {
+                    continue;
+                }
+
+                $safeStatement = preg_replace('/^CREATE TABLE\s+/i', 'CREATE TABLE IF NOT EXISTS ', $statement);
+                if (!is_string($safeStatement) || trim($safeStatement) === '') {
+                    continue;
+                }
+
+                try {
+                    $db->exec($safeStatement);
+                } catch (\Throwable) {
+                    // Evita detener el flujo si existe una dependencia o permiso faltante.
+                }
+            }
+        } catch (\Throwable) {
+            // Sin bloqueo: se continuará con el flujo normal y mensaje de error del módulo si aplica.
         }
     }
 
