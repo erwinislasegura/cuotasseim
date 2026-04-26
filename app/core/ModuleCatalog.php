@@ -27,13 +27,10 @@ class ModuleCatalog
             'aportes' => ['title' => 'Aportes', 'description' => 'Seguimiento de aportes extraordinarios por origen y estado.', 'table' => 'aportes', 'route' => 'aportes'],
             'tipos_egreso' => ['title' => 'Tipos de egreso', 'description' => 'Clasificación de egresos para tesorería y rendiciones.', 'table' => 'tipos_egreso', 'route' => 'tipos-egreso'],
             'egresos' => ['title' => 'Egresos', 'description' => 'Control operativo de egresos, comprobantes y estado.', 'table' => 'egresos', 'route' => 'egresos'],
-            'rendiciones' => ['title' => 'Rendiciones', 'description' => 'Consulta consolidada de ingresos y egresos por periodo y socio.', 'table' => 'movimientos_tesoreria', 'route' => 'rendiciones', 'read_only' => true],
-            'tesoreria' => ['title' => 'Movimientos de tesorería', 'description' => 'Seguimiento de movimientos, diferencias y conciliación.', 'table' => 'movimientos_tesoreria', 'route' => 'tesoreria', 'read_only' => true],
             'roles' => ['title' => 'Roles', 'description' => 'Administración de perfiles de acceso.', 'table' => 'roles', 'route' => 'roles'],
             'usuarios' => ['title' => 'Usuarios', 'description' => 'Gestión de usuarios y permisos operativos.', 'table' => 'usuarios', 'route' => 'usuarios'],
             'configuracion' => ['title' => 'Configuración general', 'description' => 'Parámetros institucionales y reglas base del sistema.', 'table' => 'configuracion', 'route' => 'configuracion'],
-            'auditoria' => ['title' => 'Auditoría', 'description' => 'Trazabilidad por módulo, usuario y acción.', 'table' => 'auditoria', 'route' => 'auditoria', 'read_only' => true],
-            'reportes' => ['title' => 'Reportes', 'description' => 'Vista consolidada con foco ejecutivo y operativo.', 'table' => 'cuotas', 'route' => 'reportes', 'read_only' => true],
+            'reportes' => ['title' => 'Reportes', 'description' => 'Reportería financiera consolidada con enfoque ejecutivo y operativo.', 'table' => 'movimientos_tesoreria', 'route' => 'reportes', 'read_only' => true],
         ];
 
         return $modules[$key] ?? null;
@@ -231,7 +228,7 @@ class ModuleCatalog
         return $record;
     }
 
-    public static function save(string $table, string $primaryKey, array $fields, array $payload, ?int $id = null): void
+    public static function save(string $table, string $primaryKey, array $fields, array $payload, ?int $id = null): int
     {
         $persistFields = $fields;
         $data = [];
@@ -490,13 +487,13 @@ class ModuleCatalog
             if ($table === 'movimientos_tesoreria') {
                 self::recalculateTreasuryBalance();
             }
-            return;
+            return $id;
         }
 
         $insertData = array_filter($data, static fn($value) => $value !== null);
 
         if (empty($insertData)) {
-            return;
+            return 0;
         }
 
         $columns = array_keys($insertData);
@@ -523,6 +520,8 @@ class ModuleCatalog
         if ($table === 'movimientos_tesoreria') {
             self::recalculateTreasuryBalance();
         }
+
+        return $newId;
     }
 
     public static function fetchSocioPlanes(int $socioId): array
@@ -624,6 +623,135 @@ class ModuleCatalog
         }
 
         return $prefix . str_pad((string) $sequence, 4, '0', STR_PAD_LEFT);
+    }
+
+
+    public static function registerAudit(string $modulo, string $accion, ?int $registroId = null, ?array $datosAnteriores = null, ?array $datosNuevos = null): void
+    {
+        if (!self::tableExists('auditoria')) {
+            return;
+        }
+
+        $usuario = Auth::user();
+        $usuarioId = (int) ($usuario['id'] ?? ($_SESSION['user_id'] ?? 0));
+        $ip = substr((string) ($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45);
+        $agent = substr((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255);
+
+        $stmt = Database::connection()->prepare(
+            'INSERT INTO auditoria (usuario_id, modulo, accion, id_registro, datos_anteriores, datos_nuevos, fecha, ip, user_agent)
+             VALUES (:usuario_id, :modulo, :accion, :id_registro, :datos_anteriores, :datos_nuevos, NOW(), :ip, :user_agent)'
+        );
+
+        if ($usuarioId > 0 && self::tableExists('usuarios')) {
+            $usuarioCheck = Database::connection()->prepare('SELECT id FROM usuarios WHERE id = :id LIMIT 1');
+            $usuarioCheck->bindValue(':id', $usuarioId, PDO::PARAM_INT);
+            $usuarioCheck->execute();
+            $usuarioId = (int) ($usuarioCheck->fetchColumn() ?: 0);
+        }
+
+        if ($usuarioId > 0) {
+            $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
+        } else {
+            $stmt->bindValue(':usuario_id', null, PDO::PARAM_NULL);
+        }
+
+        $stmt->bindValue(':modulo', $modulo);
+        $stmt->bindValue(':accion', $accion);
+
+        if (($registroId ?? 0) > 0) {
+            $stmt->bindValue(':id_registro', $registroId, PDO::PARAM_INT);
+        } else {
+            $stmt->bindValue(':id_registro', null, PDO::PARAM_NULL);
+        }
+
+        $stmt->bindValue(':datos_anteriores', $datosAnteriores !== null ? json_encode($datosAnteriores, JSON_UNESCAPED_UNICODE) : null);
+        $stmt->bindValue(':datos_nuevos', $datosNuevos !== null ? json_encode($datosNuevos, JSON_UNESCAPED_UNICODE) : null);
+        $stmt->bindValue(':ip', $ip !== '' ? $ip : null);
+        $stmt->bindValue(':user_agent', $agent !== '' ? $agent : null);
+
+        try {
+            $stmt->execute();
+        } catch (\Throwable $exception) {
+            // Evita interrumpir el flujo principal si falla la auditoría.
+        }
+    }
+
+    public static function bootstrapAuditIfEmpty(): void
+    {
+        if (!self::tableExists('auditoria')) {
+            return;
+        }
+
+        $db = Database::connection();
+        $canResolveUsers = self::tableExists('usuarios');
+        $excluded = ['auditoria', 'migrations'];
+        $tablesStmt = $db->query('SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()');
+        $tables = array_map(static fn(array $row): string => (string) ($row['table_name'] ?? ''), $tablesStmt->fetchAll());
+
+        foreach ($tables as $table) {
+            if ($table === '' || in_array($table, $excluded, true)) {
+                continue;
+            }
+            if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
+                continue;
+            }
+
+            $meta = self::resolveColumns($db, $table);
+            $primaryKey = (string) ($meta['primary'] ?? 'id');
+            $allColumns = $meta['all'] ?? [];
+            if (!in_array($primaryKey, $allColumns, true)) {
+                continue;
+            }
+
+            $userColumn = null;
+            foreach (['usuario_id', 'user_id', 'created_by'] as $candidate) {
+                if (in_array($candidate, $allColumns, true)) {
+                    $userColumn = $candidate;
+                    break;
+                }
+            }
+
+            $dateColumn = null;
+            foreach (['created_at', 'fecha', 'fecha_pago', 'fecha_aporte', 'updated_at'] as $candidate) {
+                if (in_array($candidate, $allColumns, true)) {
+                    $dateColumn = $candidate;
+                    break;
+                }
+            }
+
+            $usuarioExpr = ($userColumn !== null && $canResolveUsers)
+                ? "(SELECT u.id FROM usuarios u WHERE u.id = t.`{$userColumn}` LIMIT 1)"
+                : 'NULL';
+            $fechaExpr = $dateColumn !== null ? "COALESCE(t.`{$dateColumn}`, NOW())" : 'NOW()';
+            $deletedWhere = in_array('deleted_at', $allColumns, true) ? ' AND t.`deleted_at` IS NULL' : '';
+
+            $sql = "
+                INSERT INTO auditoria (usuario_id, modulo, accion, id_registro, datos_nuevos, fecha, ip, user_agent)
+                SELECT
+                    {$usuarioExpr},
+                    :modulo,
+                    'registro_detectado',
+                    t.`{$primaryKey}`,
+                    CONCAT('{\"tabla\":\"', :modulo, '\",\"registro_id\":', t.`{$primaryKey}`, '}'),
+                    {$fechaExpr},
+                    NULL,
+                    'bootstrap_sync'
+                FROM `{$table}` t
+                LEFT JOIN auditoria a
+                    ON a.modulo = :modulo
+                   AND a.accion = 'registro_detectado'
+                   AND a.id_registro = t.`{$primaryKey}`
+                WHERE a.id IS NULL {$deletedWhere}
+            ";
+
+            $stmt = $db->prepare($sql);
+            $stmt->bindValue(':modulo', $table);
+            try {
+                $stmt->execute();
+            } catch (\Throwable $exception) {
+                // Continúa con el siguiente módulo si alguno falla.
+            }
+        }
     }
 
     public static function delete(string $table, string $primaryKey, int $id, bool $softDelete): void

@@ -16,8 +16,6 @@ return [
     ['POST', '/tipos-socio', 'TiposSocioController@index'],
     ['GET', '/periodos', 'PeriodosController@index'],
     ['POST', '/periodos', 'PeriodosController@index'],
-    ['GET', '/conceptos-cobro', 'ConceptosCobroController@index'],
-    ['POST', '/conceptos-cobro', 'ConceptosCobroController@index'],
 
     ['GET', '/cuotas', 'CuotasController@index'],
     ['POST', '/cuotas', 'CuotasController@index'],
@@ -35,10 +33,6 @@ return [
     ['POST', '/tipos-egreso', 'TiposEgresoController@index'],
     ['GET', '/egresos', 'EgresosController@index'],
     ['POST', '/egresos', 'EgresosController@index'],
-    ['GET', '/rendiciones', 'RendicionesController@index'],
-    ['POST', '/rendiciones', 'RendicionesController@index'],
-    ['GET', '/tesoreria', 'TesoreriaController@index'],
-    ['POST', '/tesoreria', 'TesoreriaController@index'],
 
     ['GET', '/roles', 'RolesController@index'],
     ['POST', '/roles', 'RolesController@index'],
@@ -48,5 +42,4 @@ return [
     ['GET', '/reportes', 'ReportesController@index'],
     ['GET', '/configuracion', 'ConfiguracionController@index'],
     ['POST', '/configuracion', 'ConfiguracionController@index'],
-    ['GET', '/auditoria', 'AuditoriaController@index'],
 ];
