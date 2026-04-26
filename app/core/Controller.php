@@ -586,6 +586,7 @@ abstract class Controller
             if ($config['table'] === 'configuracion') {
                 $formFields = array_values(array_intersect([
                     'nombre_organizacion',
+                    'nombre_sistema',
                     'rut_organizacion',
                     'direccion',
                     'telefono',
@@ -607,6 +608,7 @@ abstract class Controller
                     ],
                     'labels' => [
                         'nombre_organizacion' => 'Nombre institución',
+                        'nombre_sistema' => 'Nombre del sistema',
                         'rut_organizacion' => 'RUT institución',
                         'direccion' => 'Dirección institucional',
                         'telefono' => 'Teléfono institucional',
@@ -617,6 +619,7 @@ abstract class Controller
                     ],
                     'required' => [
                         'nombre_organizacion' => true,
+                        'nombre_sistema' => true,
                         'rut_organizacion' => true,
                         'direccion' => true,
                         'telefono' => true,
