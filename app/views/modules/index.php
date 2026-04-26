@@ -132,9 +132,16 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
 
         <?php if (($route ?? '') === 'configuracion'): ?>
           <div class="col-12">
-            <div class="alert alert-info small mb-2">
-              <strong>Configuración Flow:</strong> ingresa Flow Api Key, Flow Secret Key y define si usarás Sandbox.
-              <br>Vista pública de pago: <a href="<?= htmlspecialchars(url('pago-flow')) ?>" target="_blank" rel="noopener"><?= htmlspecialchars(url('pago-flow')) ?></a>.
+            <div class="card border-0 bg-light mb-2">
+              <div class="card-body py-2 small">
+                <strong>Tarjeta 1 · Datos institucionales:</strong> completa nombre, RUT, dirección, teléfono y correo para registro institucional.
+              </div>
+            </div>
+            <div class="card border-0 bg-light mb-2">
+              <div class="card-body py-2 small">
+                <strong>Tarjeta 2 · Configuración Flow:</strong> ingresa Flow Api Key, Flow Secret Key y define si usarás Sandbox.
+                <br>Vista pública de pago: <a href="<?= htmlspecialchars(url('pago-flow')) ?>" target="_blank" rel="noopener"><?= htmlspecialchars(url('pago-flow')) ?></a>.
+              </div>
             </div>
           </div>
         <?php endif; ?>

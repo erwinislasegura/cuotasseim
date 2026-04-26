@@ -585,12 +585,18 @@ abstract class Controller
 
             if ($config['table'] === 'configuracion') {
                 $formFields = array_values(array_intersect([
+                    'nombre_organizacion',
+                    'rut_organizacion',
+                    'direccion',
+                    'telefono',
+                    'correo',
                     'flow_api_key',
                     'flow_secret_key',
                     'flow_modo_sandbox',
                 ], $data['columns']['form']));
                 $formMeta = [
                     'types' => [
+                        'correo' => 'email',
                         'flow_modo_sandbox' => 'select',
                     ],
                     'options' => [
@@ -600,11 +606,21 @@ abstract class Controller
                         ],
                     ],
                     'labels' => [
+                        'nombre_organizacion' => 'Nombre institución',
+                        'rut_organizacion' => 'RUT institución',
+                        'direccion' => 'Dirección institucional',
+                        'telefono' => 'Teléfono institucional',
+                        'correo' => 'Correo institucional',
                         'flow_api_key' => 'Flow Api Key',
                         'flow_secret_key' => 'Flow Secret Key',
                         'flow_modo_sandbox' => 'Flow Modo Sandbox',
                     ],
                     'required' => [
+                        'nombre_organizacion' => true,
+                        'rut_organizacion' => true,
+                        'direccion' => true,
+                        'telefono' => true,
+                        'correo' => true,
                         'flow_api_key' => true,
                         'flow_secret_key' => true,
                         'flow_modo_sandbox' => true,
