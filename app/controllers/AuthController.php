@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Core\Auth;
 use App\Core\Controller;
 use App\Core\Csrf;
+use App\Core\ModuleCatalog;
 
 class AuthController extends Controller
 {
@@ -37,8 +38,26 @@ class AuthController extends Controller
 
         if (($username === $demoUser['usuario'] || $username === $demoUser['correo']) && password_verify($password, $demoUser['password'])) {
             Auth::login($demoUser);
+            ModuleCatalog::registerAudit(
+                'auth',
+                'login',
+                (int) ($demoUser['id'] ?? 0),
+                null,
+                [
+                    'usuario' => (string) ($demoUser['usuario'] ?? ''),
+                    'correo' => (string) ($demoUser['correo'] ?? ''),
+                ]
+            );
             $this->redirect('/panel');
         }
+
+        ModuleCatalog::registerAudit(
+            'auth',
+            'login_fallido',
+            null,
+            null,
+            ['usuario_ingresado' => $username]
+        );
 
         $this->view('auth/login', [
             'title' => 'Iniciar sesión',
@@ -49,6 +68,14 @@ class AuthController extends Controller
 
     public function logout(): void
     {
+        $user = Auth::user();
+        ModuleCatalog::registerAudit(
+            'auth',
+            'logout',
+            (int) ($user['id'] ?? 0),
+            ['usuario' => (string) ($user['usuario'] ?? ''), 'correo' => (string) ($user['correo'] ?? '')],
+            null
+        );
         Auth::logout();
         $this->redirect('/');
     }
