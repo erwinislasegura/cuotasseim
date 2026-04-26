@@ -385,7 +385,24 @@ abstract class Controller
                         $id = null;
                     }
 
-                    $savedId = ModuleCatalog::save($config['table'], $primaryKey, $columnsMeta['form'], $_POST, $isUpdate ? $id : null);
+                    $saveFields = $columnsMeta['form'];
+                    if (($config['table'] ?? '') === 'configuracion') {
+                        $saveFields = array_values(array_intersect([
+                            'nombre_organizacion',
+                            'nombre_sistema',
+                            'logo',
+                            'rut_organizacion',
+                            'direccion',
+                            'telefono',
+                            'correo',
+                            'sitio_web',
+                            'flow_api_key',
+                            'flow_secret_key',
+                            'flow_modo_sandbox',
+                        ], $columnsMeta['form']));
+                    }
+
+                    $savedId = ModuleCatalog::save($config['table'], $primaryKey, $saveFields, $_POST, $isUpdate ? $id : null);
                     $targetId = $savedId > 0 ? $savedId : ($isUpdate ? (int) $id : 0);
                     $currentRecord = $targetId > 0 ? ModuleCatalog::findById($config['table'], $primaryKey, $targetId) : null;
 
