@@ -325,6 +325,28 @@ body {
   word-break: break-word;
 }
 
+
+.module-highlight {
+  border: 1px solid #d5e1ee;
+  border-radius: 0.75rem;
+  background: linear-gradient(180deg, #f8fbff 0%, #f2f7fd 100%);
+  padding: 0.68rem 0.82rem;
+}
+
+.module-highlight-title {
+  color: #173a60;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.15rem;
+}
+
+.module-highlight-text {
+  color: #4a617a;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
 .kpi-card { position: relative; overflow: hidden; }
 .kpi-card .kpi-label { color: var(--ui-muted); font-size: 0.74rem; }
 .kpi-card .kpi-value { font-size: 1.24rem; font-weight: 700; }

@@ -27,13 +27,11 @@ class ModuleCatalog
             'aportes' => ['title' => 'Aportes', 'description' => 'Seguimiento de aportes extraordinarios por origen y estado.', 'table' => 'aportes', 'route' => 'aportes'],
             'tipos_egreso' => ['title' => 'Tipos de egreso', 'description' => 'Clasificación de egresos para tesorería y rendiciones.', 'table' => 'tipos_egreso', 'route' => 'tipos-egreso'],
             'egresos' => ['title' => 'Egresos', 'description' => 'Control operativo de egresos, comprobantes y estado.', 'table' => 'egresos', 'route' => 'egresos'],
-            'rendiciones' => ['title' => 'Rendiciones', 'description' => 'Consulta consolidada de ingresos y egresos por periodo y socio.', 'table' => 'movimientos_tesoreria', 'route' => 'rendiciones', 'read_only' => true],
-            'tesoreria' => ['title' => 'Movimientos de tesorería', 'description' => 'Seguimiento de movimientos, diferencias y conciliación.', 'table' => 'movimientos_tesoreria', 'route' => 'tesoreria', 'read_only' => true],
             'roles' => ['title' => 'Roles', 'description' => 'Administración de perfiles de acceso.', 'table' => 'roles', 'route' => 'roles'],
             'usuarios' => ['title' => 'Usuarios', 'description' => 'Gestión de usuarios y permisos operativos.', 'table' => 'usuarios', 'route' => 'usuarios'],
             'configuracion' => ['title' => 'Configuración general', 'description' => 'Parámetros institucionales y reglas base del sistema.', 'table' => 'configuracion', 'route' => 'configuracion'],
             'auditoria' => ['title' => 'Auditoría', 'description' => 'Trazabilidad por módulo, usuario y acción.', 'table' => 'auditoria', 'route' => 'auditoria', 'read_only' => true],
-            'reportes' => ['title' => 'Reportes', 'description' => 'Vista consolidada con foco ejecutivo y operativo.', 'table' => 'cuotas', 'route' => 'reportes', 'read_only' => true],
+            'reportes' => ['title' => 'Reportes', 'description' => 'Reportería financiera consolidada con enfoque ejecutivo y operativo.', 'table' => 'movimientos_tesoreria', 'route' => 'reportes', 'read_only' => true],
         ];
 
         return $modules[$key] ?? null;

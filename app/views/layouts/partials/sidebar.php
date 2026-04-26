@@ -27,8 +27,6 @@ $menu = [
         ['route' => 'pagos', 'label' => 'Historial de pagos', 'icon' => 'bi-credit-card-2-front'],
         ['route' => 'aportes', 'label' => 'Aportes', 'icon' => 'bi-piggy-bank'],
         ['route' => 'egresos', 'label' => 'Egresos', 'icon' => 'bi-cash-stack'],
-        ['route' => 'rendiciones', 'label' => 'Rendiciones', 'icon' => 'bi-journal-check'],
-        ['route' => 'tesoreria', 'label' => 'Tesorería', 'icon' => 'bi-bank'],
     ],
     'Gestión' => [
         ['route' => 'reportes', 'label' => 'Reportes', 'icon' => 'bi-bar-chart'],

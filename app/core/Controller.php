@@ -45,7 +45,7 @@ abstract class Controller
         $extraConditions = [];
         $extraQueryParams = [];
 
-        if (($config['route'] ?? '') === 'rendiciones') {
+        if (($config['route'] ?? '') === 'reportes') {
             $periodPreset = trim((string) ($_GET['periodo'] ?? ''));
             $socioId = (int) ($_GET['socio_id'] ?? 0);
             $montoMin = trim((string) ($_GET['monto_min'] ?? ''));
@@ -142,7 +142,7 @@ abstract class Controller
 
             if (($_GET['export'] ?? '') === 'excel') {
                 ModuleCatalog::exportCsv(
-                    'rendiciones_' . date('Ymd_His') . '.csv',
+                    'reportes_' . date('Ymd_His') . '.csv',
                     ['fecha', 'tipo_movimiento', 'origen_modulo', 'descripcion', 'ingreso', 'egreso'],
                     $rendicionesResult['filtered_rows']
                 );
@@ -193,8 +193,8 @@ abstract class Controller
                 ksort($byMonth);
                 ksort($byOrigin);
 
-                $this->view('rendiciones/report', [
-                    'title' => 'Informe de rendiciones',
+                $this->view('reportes/report', [
+                    'title' => 'Informe de reportes',
                     'rows' => $reportRows,
                     'query' => $query,
                     'status' => $status,
@@ -212,7 +212,7 @@ abstract class Controller
             $sociosStmt = Database::connection()->query('SELECT id, nombre_completo, rut, numero_socio FROM socios WHERE deleted_at IS NULL ORDER BY nombre_completo ASC');
             $socios = $sociosStmt->fetchAll();
             $formMeta = [
-                'rendiciones_filter_options' => [
+                'reportes_filter_options' => [
                     'periodos' => [
                         ['value' => '', 'label' => 'Manual (Desde/Hasta)'],
                         ['value' => 'mes_actual', 'label' => 'Mes actual'],
@@ -333,7 +333,7 @@ abstract class Controller
                 return;
             }
 
-            if (($config['route'] ?? '') === 'rendiciones' && (string) ($_GET['report'] ?? '') === 'print') {
+            if (($config['route'] ?? '') === 'reportes' && (string) ($_GET['report'] ?? '') === 'print') {
                 $fullPerPage = max(1, min(5000, (int) ($data['total'] ?? 0)));
                 $fullData = ModuleCatalog::fetchData(
                     $config,
@@ -389,8 +389,8 @@ abstract class Controller
                 ksort($byMonth);
                 ksort($byOrigin);
 
-                $this->view('rendiciones/report', [
-                    'title' => 'Informe de rendiciones',
+                $this->view('reportes/report', [
+                    'title' => 'Informe de reportes',
                     'rows' => $reportRows,
                     'query' => $query,
                     'status' => $status,
@@ -733,7 +733,7 @@ abstract class Controller
                 ], $data['columns']['all']));
             }
 
-            if (($config['route'] ?? '') === 'rendiciones') {
+            if (($config['route'] ?? '') === 'reportes') {
                 $sociosStmt = Database::connection()->query('SELECT id, nombre_completo, rut, numero_socio FROM socios WHERE deleted_at IS NULL ORDER BY nombre_completo ASC');
                 $socios = $sociosStmt->fetchAll();
 
@@ -756,7 +756,7 @@ abstract class Controller
                     'saldo_referencial',
                 ], $data['columns']['all']));
                 $formFields = [];
-                $formMeta['rendiciones_filter_options'] = [
+                $formMeta['reportes_filter_options'] = [
                     'periodos' => [
                         ['value' => '', 'label' => 'Manual (Desde/Hasta)'],
                         ['value' => 'mes_actual', 'label' => 'Mes actual'],
