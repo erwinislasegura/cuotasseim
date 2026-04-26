@@ -1,3 +1,29 @@
+<?php
+$periodoAPagarLabel = static function (array $cuota): string {
+  $tipo = trim((string) ($cuota['tipo_periodo'] ?? 'mensual'));
+  $fechaBase = (string) ($cuota['fecha_vencimiento'] ?? date('Y-m-d'));
+  $month = (int) date('n', strtotime($fechaBase));
+  $year = (int) date('Y', strtotime($fechaBase));
+  $meses = [1 => 'enero', 2 => 'febrero', 3 => 'marzo', 4 => 'abril', 5 => 'mayo', 6 => 'junio', 7 => 'julio', 8 => 'agosto', 9 => 'septiembre', 10 => 'octubre', 11 => 'noviembre', 12 => 'diciembre'];
+
+  if ($tipo === 'trimestral') {
+    $n = (int) ceil(max(1, min(12, $month)) / 3);
+    $map = [1 => 'uno', 2 => 'dos', 3 => 'tres', 4 => 'cuatro'];
+    return 'Trimestre ' . ($map[$n] ?? (string) $n) . ' ' . $year;
+  }
+  if ($tipo === 'semestral') {
+    $n = $month <= 6 ? 1 : 2;
+    $map = [1 => 'uno', 2 => 'dos'];
+    return 'Semestre ' . ($map[$n] ?? (string) $n) . ' ' . $year;
+  }
+  if ($tipo === 'anual') {
+    return 'Año ' . $year;
+  }
+
+  return 'Mes ' . ($meses[$month] ?? (string) $month) . ' ' . $year;
+};
+?>
+
 <section class="page-header d-flex justify-content-between align-items-start mb-3 gap-2 flex-wrap">
   <div>
     <h1 class="mb-1"><?= htmlspecialchars($title ?? 'Registro de cuotas') ?></h1>
@@ -74,7 +100,7 @@
               <div><span>N° Socio</span><strong><?= htmlspecialchars((string) ($socio['numero_socio'] ?? '-')) ?></strong></div>
               <?php if (!empty($cuotaPorVencer)): ?>
                 <div><span>Plan</span><strong><?= htmlspecialchars((string) ($cuotaPorVencer['nombre_periodo'] ?? '-')) ?></strong></div>
-                <div><span>Periodo</span><strong><?= htmlspecialchars(ucfirst((string) ($cuotaPorVencer['tipo_periodo'] ?? '-'))) ?></strong></div>
+                <div><span>Periodo</span><strong><?= htmlspecialchars($periodoAPagarLabel($cuotaPorVencer)) ?></strong></div>
                 <div><span>Saldo pendiente</span><strong><?= htmlspecialchars(money((float) ($cuotaPorVencer['saldo_pendiente'] ?? 0))) ?></strong></div>
               <?php endif; ?>
             </div>
@@ -114,10 +140,10 @@
                         <?php
                           $cuotaId = (int) ($cuotaItem['id'] ?? 0);
                           $saldoPendienteItem = (float) ($cuotaItem['saldo_pendiente'] ?? 0);
-                          $tipoPeriodoItem = ucfirst((string) ($cuotaItem['tipo_periodo'] ?? '-'));
+                          $periodoTextoItem = $periodoAPagarLabel($cuotaItem);
                           $venceItem = !empty($cuotaItem['fecha_vencimiento']) ? human_date((string) $cuotaItem['fecha_vencimiento']) : '-';
                           $labelPeriodo = trim((string) ($cuotaItem['nombre_periodo'] ?? ('Cuota #' . $cuotaId)));
-                          $label = $labelPeriodo . ' · ' . $tipoPeriodoItem . ' · Vence: ' . $venceItem . ' · Saldo: ' . money($saldoPendienteItem);
+                          $label = $labelPeriodo . ' · ' . $periodoTextoItem . ' · Vence: ' . $venceItem . ' · Saldo: ' . money($saldoPendienteItem);
                           if ($cuotaId <= 0) {
                             $label .= ' · (se generará automáticamente)';
                           }
