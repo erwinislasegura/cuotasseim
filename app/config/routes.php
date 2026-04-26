@@ -35,10 +35,6 @@ return [
     ['POST', '/tipos-egreso', 'TiposEgresoController@index'],
     ['GET', '/egresos', 'EgresosController@index'],
     ['POST', '/egresos', 'EgresosController@index'],
-    ['GET', '/rendiciones', 'RendicionesController@index'],
-    ['POST', '/rendiciones', 'RendicionesController@index'],
-    ['GET', '/tesoreria', 'TesoreriaController@index'],
-    ['POST', '/tesoreria', 'TesoreriaController@index'],
 
     ['GET', '/roles', 'RolesController@index'],
     ['POST', '/roles', 'RolesController@index'],
