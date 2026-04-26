@@ -643,6 +643,13 @@ class ModuleCatalog
              VALUES (:usuario_id, :modulo, :accion, :id_registro, :datos_anteriores, :datos_nuevos, NOW(), :ip, :user_agent)'
         );
 
+        if ($usuarioId > 0 && self::tableExists('usuarios')) {
+            $usuarioCheck = Database::connection()->prepare('SELECT id FROM usuarios WHERE id = :id LIMIT 1');
+            $usuarioCheck->bindValue(':id', $usuarioId, PDO::PARAM_INT);
+            $usuarioCheck->execute();
+            $usuarioId = (int) ($usuarioCheck->fetchColumn() ?: 0);
+        }
+
         if ($usuarioId > 0) {
             $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
         } else {
@@ -663,7 +670,11 @@ class ModuleCatalog
         $stmt->bindValue(':ip', $ip !== '' ? $ip : null);
         $stmt->bindValue(':user_agent', $agent !== '' ? $agent : null);
 
-        $stmt->execute();
+        try {
+            $stmt->execute();
+        } catch (\Throwable $exception) {
+            // Evita interrumpir el flujo principal si falla la auditoría.
+        }
     }
 
     public static function delete(string $table, string $primaryKey, int $id, bool $softDelete): void
