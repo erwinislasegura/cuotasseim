@@ -92,11 +92,62 @@
                 <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($token ?? '')) ?>">
                 <input type="hidden" name="q" value="<?= htmlspecialchars((string) ($q ?? '')) ?>">
                 <input type="hidden" name="socio_id" value="<?= (int) ($socio['id'] ?? 0) ?>">
-                <input type="hidden" name="cuota_id" value="<?= (int) ($cuotaPorVencer['id'] ?? 0) ?>">
+                <?php
+                  $cuotasSeleccionables = [];
+                  if (!empty($cuotaPorVencer)) {
+                    $cuotasSeleccionables[] = $cuotaPorVencer;
+                  }
+                  if (!empty($otrasCuotas ?? [])) {
+                    foreach ($otrasCuotas as $cuotaPendiente) {
+                      if ((int) ($cuotaPendiente['id'] ?? 0) > 0) {
+                        $cuotasSeleccionables[] = $cuotaPendiente;
+                      }
+                    }
+                  }
+                ?>
+
+                <?php if (!empty($cuotasSeleccionables)): ?>
+                  <div class="col-12">
+                    <label class="form-label">Periodo a pagar</label>
+                    <select name="cuota_id" class="form-select form-select-sm js-cuota-selector" required>
+                      <?php foreach ($cuotasSeleccionables as $index => $cuotaItem): ?>
+                        <?php
+                          $cuotaId = (int) ($cuotaItem['id'] ?? 0);
+                          $saldoPendienteItem = (float) ($cuotaItem['saldo_pendiente'] ?? 0);
+                          $tipoPeriodoItem = ucfirst((string) ($cuotaItem['tipo_periodo'] ?? '-'));
+                          $venceItem = !empty($cuotaItem['fecha_vencimiento']) ? human_date((string) $cuotaItem['fecha_vencimiento']) : '-';
+                          $labelPeriodo = trim((string) ($cuotaItem['nombre_periodo'] ?? ('Cuota #' . $cuotaId)));
+                          $label = $labelPeriodo . ' · ' . $tipoPeriodoItem . ' · Vence: ' . $venceItem . ' · Saldo: ' . money($saldoPendienteItem);
+                          if ($cuotaId <= 0) {
+                            $label .= ' · (se generará automáticamente)';
+                          }
+                        ?>
+                        <option
+                          value="<?= $cuotaId ?>"
+                          data-saldo="<?= htmlspecialchars((string) $saldoPendienteItem) ?>"
+                          <?= $index === 0 ? 'selected' : '' ?>
+                        >
+                          <?= htmlspecialchars($label) ?>
+                        </option>
+                      <?php endforeach; ?>
+                    </select>
+                  </div>
+                <?php else: ?>
+                  <input type="hidden" name="cuota_id" value="<?= (int) ($cuotaPorVencer['id'] ?? 0) ?>">
+                <?php endif; ?>
 
                 <div class="col-12">
                   <label class="form-label">Monto (editable)</label>
-                  <input type="number" step="0.01" min="0.01" max="<?= htmlspecialchars((string) ((float) ($cuotaPorVencer['saldo_pendiente'] ?? 0))) ?>" name="monto_pago" class="form-control form-control-sm" value="<?= htmlspecialchars((string) ((float) ($cuotaPorVencer['saldo_pendiente'] ?? 0))) ?>" required>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    max="<?= htmlspecialchars((string) ((float) ($cuotaPorVencer['saldo_pendiente'] ?? 0))) ?>"
+                    name="monto_pago"
+                    class="form-control form-control-sm js-monto-pago"
+                    value="<?= htmlspecialchars((string) ((float) ($cuotaPorVencer['saldo_pendiente'] ?? 0))) ?>"
+                    required
+                  >
                 </div>
 
                 <div class="col-12">
@@ -147,3 +198,29 @@
     </div>
   </div>
 </div>
+
+<script>
+  (function () {
+    const cuotaSelector = document.querySelector('.js-cuota-selector');
+    const montoInput = document.querySelector('.js-monto-pago');
+    if (!cuotaSelector || !montoInput) {
+      return;
+    }
+
+    const actualizarMontoDesdePeriodo = function () {
+      const option = cuotaSelector.options[cuotaSelector.selectedIndex];
+      if (!option) {
+        return;
+      }
+      const saldo = parseFloat(option.getAttribute('data-saldo') || '0');
+      if (!Number.isFinite(saldo) || saldo <= 0) {
+        return;
+      }
+      montoInput.max = String(saldo);
+      montoInput.value = String(saldo);
+    };
+
+    cuotaSelector.addEventListener('change', actualizarMontoDesdePeriodo);
+    actualizarMontoDesdePeriodo();
+  })();
+</script>
