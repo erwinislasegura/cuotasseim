@@ -316,12 +316,33 @@ abstract class Controller
                 $id = isset($_POST['id']) ? (int) $_POST['id'] : null;
 
                 if (!$isReadOnly && $action === 'save') {
-                    ModuleCatalog::save($config['table'], $primaryKey, $columnsMeta['form'], $_POST, $id > 0 ? $id : null);
-                    $_SESSION['flash_success'] = $id ? 'Registro actualizado correctamente.' : 'Registro creado correctamente.';
+                    $isUpdate = $id !== null && $id > 0;
+                    $previousRecord = $isUpdate ? ModuleCatalog::findById($config['table'], $primaryKey, $id) : null;
+                    $savedId = ModuleCatalog::save($config['table'], $primaryKey, $columnsMeta['form'], $_POST, $isUpdate ? $id : null);
+                    $targetId = $savedId > 0 ? $savedId : ($isUpdate ? (int) $id : 0);
+                    $currentRecord = $targetId > 0 ? ModuleCatalog::findById($config['table'], $primaryKey, $targetId) : null;
+
+                    ModuleCatalog::registerAudit(
+                        (string) ($config['route'] ?? $moduleKey),
+                        $isUpdate ? 'actualizar' : 'crear',
+                        $targetId > 0 ? $targetId : null,
+                        is_array($previousRecord) ? $previousRecord : null,
+                        is_array($currentRecord) ? $currentRecord : null
+                    );
+
+                    $_SESSION['flash_success'] = $isUpdate ? 'Registro actualizado correctamente.' : 'Registro creado correctamente.';
                 }
 
                 if (!$isReadOnly && $action === 'delete' && $id !== null && $id > 0) {
+                    $deletedRecord = ModuleCatalog::findById($config['table'], $primaryKey, $id);
                     ModuleCatalog::delete($config['table'], $primaryKey, $id, $columnsMeta['has_deleted_at']);
+                    ModuleCatalog::registerAudit(
+                        (string) ($config['route'] ?? $moduleKey),
+                        'eliminar',
+                        $id,
+                        is_array($deletedRecord) ? $deletedRecord : null,
+                        null
+                    );
                     $_SESSION['flash_success'] = 'Registro eliminado correctamente.';
                 }
 
@@ -415,6 +436,55 @@ abstract class Controller
             $columnLabels = [];
             $visibleColumns = $data['columns']['visible'];
             $displayRows = ModuleCatalog::decorateRowsForDisplay($config['table'], $data['rows']);
+
+            if (($config['route'] ?? '') === 'auditoria') {
+                $usuariosMap = [];
+                foreach ($displayRows as $auditRow) {
+                    $uid = (int) ($auditRow['usuario_id'] ?? 0);
+                    if ($uid > 0) {
+                        $usuariosMap[$uid] = $uid;
+                    }
+                }
+
+                if (!empty($usuariosMap) && ModuleCatalog::tableExists('usuarios')) {
+                    $ids = array_keys($usuariosMap);
+                    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                    $stmtUsuarios = Database::connection()->prepare('SELECT id, nombre, usuario, correo FROM usuarios WHERE id IN (' . $placeholders . ')');
+                    foreach ($ids as $index => $userId) {
+                        $stmtUsuarios->bindValue($index + 1, $userId, \PDO::PARAM_INT);
+                    }
+                    $stmtUsuarios->execute();
+
+                    foreach ($stmtUsuarios->fetchAll() as $userRow) {
+                        $userId = (int) ($userRow['id'] ?? 0);
+                        if ($userId <= 0) {
+                            continue;
+                        }
+                        $nombre = trim((string) ($userRow['nombre'] ?? ''));
+                        $usuario = trim((string) ($userRow['usuario'] ?? ''));
+                        $correo = trim((string) ($userRow['correo'] ?? ''));
+                        $label = $nombre !== '' ? $nombre : ($usuario !== '' ? $usuario : ('Usuario #' . $userId));
+                        if ($usuario !== '' && $usuario !== $label) {
+                            $label .= ' · @' . $usuario;
+                        }
+                        if ($correo !== '') {
+                            $label .= ' · ' . $correo;
+                        }
+                        $usuariosMap[$userId] = $label;
+                    }
+                }
+
+                $displayRows = array_map(static function (array $auditRow) use ($usuariosMap): array {
+                    $uid = (int) ($auditRow['usuario_id'] ?? 0);
+                    if ($uid > 0) {
+                        $auditRow['usuario_id'] = (string) ($usuariosMap[$uid] ?? ('Usuario #' . $uid));
+                    } else {
+                        $auditRow['usuario_id'] = 'Sistema';
+                    }
+
+                    return $auditRow;
+                }, $displayRows);
+            }
 
             if ($editId !== null && $editId > 0) {
                 $currentRecord = ModuleCatalog::findById($config['table'], $primaryKey, $editId);
@@ -731,6 +801,30 @@ abstract class Controller
                     'numero_documento',
                     'estado',
                 ], $data['columns']['all']));
+            }
+
+            if (($config['route'] ?? '') === 'auditoria') {
+                $columnLabels = [
+                    'usuario_id' => 'Usuario',
+                    'modulo' => 'Módulo',
+                    'accion' => 'Acción',
+                    'id_registro' => 'ID registro',
+                    'datos_anteriores' => 'Datos anteriores',
+                    'datos_nuevos' => 'Datos nuevos',
+                    'fecha' => 'Fecha',
+                    'ip' => 'IP',
+                    'user_agent' => 'Navegador',
+                ];
+                $visibleColumns = array_values(array_intersect([
+                    'fecha',
+                    'usuario_id',
+                    'modulo',
+                    'accion',
+                    'id_registro',
+                    'ip',
+                    'user_agent',
+                ], $data['columns']['all']));
+                $formFields = [];
             }
 
             if (($config['route'] ?? '') === 'reportes') {

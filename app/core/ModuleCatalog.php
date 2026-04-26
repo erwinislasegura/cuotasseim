@@ -229,7 +229,7 @@ class ModuleCatalog
         return $record;
     }
 
-    public static function save(string $table, string $primaryKey, array $fields, array $payload, ?int $id = null): void
+    public static function save(string $table, string $primaryKey, array $fields, array $payload, ?int $id = null): int
     {
         $persistFields = $fields;
         $data = [];
@@ -488,13 +488,13 @@ class ModuleCatalog
             if ($table === 'movimientos_tesoreria') {
                 self::recalculateTreasuryBalance();
             }
-            return;
+            return $id;
         }
 
         $insertData = array_filter($data, static fn($value) => $value !== null);
 
         if (empty($insertData)) {
-            return;
+            return 0;
         }
 
         $columns = array_keys($insertData);
@@ -521,6 +521,8 @@ class ModuleCatalog
         if ($table === 'movimientos_tesoreria') {
             self::recalculateTreasuryBalance();
         }
+
+        return $newId;
     }
 
     public static function fetchSocioPlanes(int $socioId): array
@@ -622,6 +624,46 @@ class ModuleCatalog
         }
 
         return $prefix . str_pad((string) $sequence, 4, '0', STR_PAD_LEFT);
+    }
+
+
+    public static function registerAudit(string $modulo, string $accion, ?int $registroId = null, ?array $datosAnteriores = null, ?array $datosNuevos = null): void
+    {
+        if (!self::tableExists('auditoria')) {
+            return;
+        }
+
+        $usuario = Auth::user();
+        $usuarioId = (int) ($usuario['id'] ?? ($_SESSION['user_id'] ?? 0));
+        $ip = substr((string) ($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45);
+        $agent = substr((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255);
+
+        $stmt = Database::connection()->prepare(
+            'INSERT INTO auditoria (usuario_id, modulo, accion, id_registro, datos_anteriores, datos_nuevos, fecha, ip, user_agent)
+             VALUES (:usuario_id, :modulo, :accion, :id_registro, :datos_anteriores, :datos_nuevos, NOW(), :ip, :user_agent)'
+        );
+
+        if ($usuarioId > 0) {
+            $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
+        } else {
+            $stmt->bindValue(':usuario_id', null, PDO::PARAM_NULL);
+        }
+
+        $stmt->bindValue(':modulo', $modulo);
+        $stmt->bindValue(':accion', $accion);
+
+        if (($registroId ?? 0) > 0) {
+            $stmt->bindValue(':id_registro', $registroId, PDO::PARAM_INT);
+        } else {
+            $stmt->bindValue(':id_registro', null, PDO::PARAM_NULL);
+        }
+
+        $stmt->bindValue(':datos_anteriores', $datosAnteriores !== null ? json_encode($datosAnteriores, JSON_UNESCAPED_UNICODE) : null);
+        $stmt->bindValue(':datos_nuevos', $datosNuevos !== null ? json_encode($datosNuevos, JSON_UNESCAPED_UNICODE) : null);
+        $stmt->bindValue(':ip', $ip !== '' ? $ip : null);
+        $stmt->bindValue(':user_agent', $agent !== '' ? $agent : null);
+
+        $stmt->execute();
     }
 
     public static function delete(string $table, string $primaryKey, int $id, bool $softDelete): void
