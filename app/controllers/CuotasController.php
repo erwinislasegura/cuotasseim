@@ -196,7 +196,23 @@ class CuotasController extends Controller
 
     private function registrarPagoCuota(\PDO $db, int $socioId, int $cuotaId, int $medioPagoId, string $fechaPago, float $monto): void
     {
-        $stmtCuota = $db->prepare("SELECT id, estado_cuota, saldo_pendiente, monto_pagado FROM cuotas WHERE id = :id AND socio_id = :socio_id AND deleted_at IS NULL LIMIT 1 FOR UPDATE");
+        $stmtCuota = $db->prepare("SELECT
+                c.id,
+                c.estado_cuota,
+                c.saldo_pendiente,
+                c.monto_pagado,
+                c.fecha_vencimiento,
+                p.tipo_periodo,
+                p.anio,
+                p.mes,
+                p.fecha_inicio
+            FROM cuotas c
+            LEFT JOIN periodos p ON p.id = c.periodo_id
+            WHERE c.id = :id
+              AND c.socio_id = :socio_id
+              AND c.deleted_at IS NULL
+            LIMIT 1
+            FOR UPDATE");
         $db->beginTransaction();
         try {
             $stmtCuota->bindValue(':id', $cuotaId, \PDO::PARAM_INT);
@@ -226,15 +242,17 @@ class CuotasController extends Controller
             $usuario = Auth::user();
             $usuarioId = (int) ($usuario['id'] ?? $_SESSION['user_id'] ?? 1);
             $numeroComprobante = 'CUO-' . date('Ymd-His') . '-' . random_int(100, 999);
+            $periodoAPagar = $this->formatearPeriodoAPagar($cuota);
 
-            $stmtPago = $db->prepare("INSERT INTO pagos (socio_id, fecha_pago, monto_total, medio_pago_id, numero_comprobante, observacion, estado_pago, usuario_id)
-                VALUES (:socio_id, :fecha_pago, :monto_total, :medio_pago_id, :numero_comprobante, :observacion, 'aplicado', :usuario_id)");
+            $stmtPago = $db->prepare("INSERT INTO pagos (socio_id, fecha_pago, monto_total, medio_pago_id, numero_comprobante, observacion, periodo_a_pagar, estado_pago, usuario_id)
+                VALUES (:socio_id, :fecha_pago, :monto_total, :medio_pago_id, :numero_comprobante, :observacion, :periodo_a_pagar, 'aplicado', :usuario_id)");
             $stmtPago->bindValue(':socio_id', $socioId, \PDO::PARAM_INT);
             $stmtPago->bindValue(':fecha_pago', $fechaPago);
             $stmtPago->bindValue(':monto_total', $monto);
             $stmtPago->bindValue(':medio_pago_id', $medioPagoId, \PDO::PARAM_INT);
             $stmtPago->bindValue(':numero_comprobante', $numeroComprobante);
             $stmtPago->bindValue(':observacion', 'Pago registrado desde Registro de cuotas');
+            $stmtPago->bindValue(':periodo_a_pagar', $periodoAPagar);
             $stmtPago->bindValue(':usuario_id', $usuarioId, \PDO::PARAM_INT);
             $stmtPago->execute();
 
@@ -313,6 +331,40 @@ class CuotasController extends Controller
         $stmtInsert->execute();
 
         return (int) $db->lastInsertId();
+    }
+
+    private function formatearPeriodoAPagar(array $cuota): string
+    {
+        $tipoPeriodo = trim((string) ($cuota['tipo_periodo'] ?? 'mensual'));
+        $mesBase = (int) ($cuota['mes'] ?? 0);
+        if ($mesBase < 1 || $mesBase > 12) {
+            $mesBase = (int) date('n', strtotime((string) ($cuota['fecha_inicio'] ?? $cuota['fecha_vencimiento'] ?? 'now')));
+        }
+        $anioBase = (int) ($cuota['anio'] ?? 0);
+        if ($anioBase <= 0) {
+            $anioBase = (int) date('Y', strtotime((string) ($cuota['fecha_inicio'] ?? $cuota['fecha_vencimiento'] ?? 'now')));
+        }
+
+        $meses = [
+            1 => 'enero', 2 => 'febrero', 3 => 'marzo', 4 => 'abril', 5 => 'mayo', 6 => 'junio',
+            7 => 'julio', 8 => 'agosto', 9 => 'septiembre', 10 => 'octubre', 11 => 'noviembre', 12 => 'diciembre',
+        ];
+        $trimestres = [1 => 'uno', 2 => 'dos', 3 => 'tres', 4 => 'cuatro'];
+        $semestres = [1 => 'uno', 2 => 'dos'];
+
+        if ($tipoPeriodo === 'trimestral') {
+            $trimestre = (int) ceil(max(1, min(12, $mesBase)) / 3);
+            return 'Trimestre ' . ($trimestres[$trimestre] ?? (string) $trimestre) . ' ' . $anioBase;
+        }
+        if ($tipoPeriodo === 'semestral') {
+            $semestre = $mesBase <= 6 ? 1 : 2;
+            return 'Semestre ' . ($semestres[$semestre] ?? (string) $semestre) . ' ' . $anioBase;
+        }
+        if ($tipoPeriodo === 'anual') {
+            return 'Año ' . $anioBase;
+        }
+
+        return 'Mes ' . ($meses[$mesBase] ?? (string) $mesBase) . ' ' . $anioBase;
     }
 
     private function obtenerCuotaActualDesdePlan(\PDO $db, int $socioId): ?array

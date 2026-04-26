@@ -184,10 +184,10 @@ try {
     <h3 class="section-title">Detalle de movimientos filtrados</h3>
     <div class="table-wrap table-responsive">
       <table class="table table-sm table-hover mb-0">
-        <thead><tr><th>#</th><th>Fecha</th><th>Tipo</th><th>Origen</th><th>Descripción</th><th class="text-end">Ingreso</th><th class="text-end">Egreso</th></tr></thead>
+        <thead><tr><th>#</th><th>Fecha</th><th>Tipo</th><th>Origen</th><th>Periodo a pagar</th><th>Descripción</th><th class="text-end">Ingreso</th><th class="text-end">Egreso</th></tr></thead>
         <tbody>
           <?php if (empty($rows)): ?>
-            <tr><td colspan="7" class="text-center py-3">No hay movimientos para este filtro.</td></tr>
+            <tr><td colspan="8" class="text-center py-3">No hay movimientos para este filtro.</td></tr>
           <?php else: ?>
             <?php foreach ($rows as $i => $row): ?>
               <tr>
@@ -195,6 +195,7 @@ try {
                 <td><?= htmlspecialchars((string) ($row['fecha'] ?? '')) ?></td>
                 <td><?= htmlspecialchars((string) ($row['tipo_movimiento'] ?? '')) ?></td>
                 <td><?= htmlspecialchars((string) ($row['origen_modulo'] ?? '')) ?></td>
+                <td><?= htmlspecialchars((string) ($row['periodo_a_pagar'] ?? '-')) ?></td>
                 <td><?= htmlspecialchars((string) ($row['descripcion'] ?? '')) ?></td>
                 <td class="text-end">$<?= number_format((float) ($row['ingreso'] ?? 0), 0, ',', '.') ?></td>
                 <td class="text-end">$<?= number_format((float) ($row['egreso'] ?? 0), 0, ',', '.') ?></td>
