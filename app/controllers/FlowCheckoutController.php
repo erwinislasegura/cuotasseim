@@ -79,13 +79,14 @@ class FlowCheckoutController extends Controller
 
         $socio = $result['socio'];
         $commerceOrder = 'SOCIO-' . (int) ($socio['id'] ?? 0) . '-' . date('YmdHis');
-        $subject = 'Pago cuotas socio ' . trim((string) ($socio['nombre_completo'] ?? ''));
+        $subject = 'Pago cuotas socio #' . (int) ($socio['id'] ?? 0);
 
         $optionalPayload = [
             'socio_id' => (int) ($socio['id'] ?? 0),
             'rut' => (string) ($socio['rut'] ?? ''),
             'cuotas_ids' => array_values(array_map(static fn(array $item): int => (int) ($item['id'] ?? 0), $selectedCuotas)),
         ];
+        $optionalEncoded = base64_encode((string) json_encode($optionalPayload, JSON_UNESCAPED_UNICODE));
 
         $apiResponse = $this->flowRequest('/payment/create', [
             'apiKey' => $flowConfig['api_key'],
@@ -96,7 +97,7 @@ class FlowCheckoutController extends Controller
             'email' => (string) ($socio['correo'] ?? ''),
             'urlConfirmation' => url('pago-flow/retorno'),
             'urlReturn' => url('pago-flow/retorno'),
-            'optional' => json_encode($optionalPayload, JSON_UNESCAPED_UNICODE),
+            'optional' => $optionalEncoded,
         ], $flowConfig);
 
         if (!$apiResponse['ok']) {
@@ -254,7 +255,13 @@ class FlowCheckoutController extends Controller
             return;
         }
 
-        $optional = json_decode((string) ($flowData['optional'] ?? ''), true);
+        $optionalRaw = (string) ($flowData['optional'] ?? '');
+        $decodedBase64 = base64_decode($optionalRaw, true);
+        if (is_string($decodedBase64) && $decodedBase64 !== '') {
+            $optionalRaw = $decodedBase64;
+        }
+
+        $optional = json_decode($optionalRaw, true);
         if (!is_array($optional)) {
             return;
         }
@@ -403,17 +410,25 @@ class FlowCheckoutController extends Controller
 
     private function flowRequest(string $path, array $params, array $flowConfig): array
     {
-        $signatureData = $params;
+        $signatureData = array_filter($params, static fn($value): bool => $value !== null);
         unset($signatureData['s']);
         ksort($signatureData);
-        $toSign = http_build_query($signatureData);
-        $params['s'] = hash_hmac('sha256', $toSign, (string) $flowConfig['secret_key']);
+
+        // Flow firma el string canonical como "k=v&k2=v2" sin URL encode en cada valor.
+        $pairs = [];
+        foreach ($signatureData as $key => $value) {
+            $pairs[] = (string) $key . '=' . (string) $value;
+        }
+        $toSign = implode('&', $pairs);
+
+        $params['s'] = hash_hmac('sha256', $toSign, trim((string) ($flowConfig['secret_key'] ?? '')));
+        $postBody = http_build_query($params);
 
         $ch = curl_init((string) ($flowConfig['base_url'] . $path));
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POSTFIELDS => http_build_query($params),
+            CURLOPT_POSTFIELDS => $postBody,
             CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
             CURLOPT_TIMEOUT => 20,
         ]);
