@@ -132,19 +132,34 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
 
         <?php if (($route ?? '') === 'configuracion'): ?>
           <div class="col-12">
-            <label class="form-label">Logo institucional</label>
-            <input type="file" name="logo_file" class="form-control form-control-sm" accept=".png,.jpg,.jpeg,.webp,.svg,image/*">
-            <?php $logoActual = trim((string) ($currentRecord['logo'] ?? '')); ?>
-            <?php if ($logoActual !== ''): ?>
-              <div class="d-flex align-items-center gap-2 mt-2">
-                <img src="<?= htmlspecialchars(url($logoActual)) ?>" alt="Logo actual" style="max-height:42px; width:auto;">
-                <div class="form-check m-0">
-                  <input class="form-check-input" type="checkbox" value="1" id="eliminarLogo" name="eliminar_logo">
-                  <label class="form-check-label small" for="eliminarLogo">Eliminar logo actual</label>
-                </div>
+            <div class="card border-0 bg-light mb-2">
+              <div class="card-body py-2 small">
+                <strong>Tarjeta 1 · Datos institución:</strong> nombre institución, nombre sistema, RUT, dirección, teléfono, correo y sitio web.
               </div>
-            <?php endif; ?>
-            <small class="text-muted">Se recomienda PNG transparente o SVG.</small>
+            </div>
+            <div class="card border-0 bg-light mb-2">
+              <div class="card-body py-2">
+                <div class="small fw-semibold mb-2">Tarjeta 2 · Logo institucional</div>
+                <label class="form-label small mb-1">Logo institucional</label>
+                <input type="file" name="logo_file" class="form-control form-control-sm" accept=".png,.jpg,.jpeg,.webp,.svg,image/*">
+                <?php $logoActual = trim((string) ($currentRecord['logo'] ?? '')); ?>
+                <?php if ($logoActual !== ''): ?>
+                  <div class="d-flex align-items-center gap-2 mt-2">
+                    <img src="<?= htmlspecialchars(url($logoActual)) ?>" alt="Logo actual" style="max-height:42px; width:auto;">
+                    <div class="form-check m-0">
+                      <input class="form-check-input" type="checkbox" value="1" id="eliminarLogo" name="eliminar_logo">
+                      <label class="form-check-label small" for="eliminarLogo">Eliminar logo actual</label>
+                    </div>
+                  </div>
+                <?php endif; ?>
+              </div>
+            </div>
+            <div class="card border-0 bg-light mb-2">
+              <div class="card-body py-2 small">
+                <strong>Tarjeta 3 · Checkout Flow:</strong> Flow Api Key, Flow Secret Key y Flow Modo Sandbox.
+                <br>Vista pública de pago: <a href="<?= htmlspecialchars(url('pago-flow')) ?>" target="_blank" rel="noopener"><?= htmlspecialchars(url('pago-flow')) ?></a>.
+              </div>
+            </div>
           </div>
         <?php endif; ?>
 
