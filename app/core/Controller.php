@@ -318,6 +318,10 @@ abstract class Controller
         }
 
         try {
+            if (($config['table'] ?? '') === 'configuracion') {
+                $this->ensureFlowConfigColumns();
+            }
+
             $data = ModuleCatalog::fetchData(
                 $config,
                 $query,
@@ -1198,6 +1202,33 @@ abstract class Controller
                 'extraFilters' => [],
                 'extraQueryParams' => [],
             ]);
+        }
+    }
+
+
+    private function ensureFlowConfigColumns(): void
+    {
+        $db = Database::connection();
+
+        $required = [
+            'flow_checkout_activo' => "ALTER TABLE configuracion ADD COLUMN flow_checkout_activo TINYINT(1) NOT NULL DEFAULT 0 AFTER sitio_web",
+            'flow_api_key' => "ALTER TABLE configuracion ADD COLUMN flow_api_key VARCHAR(120) NULL AFTER flow_checkout_activo",
+            'flow_secret_key' => "ALTER TABLE configuracion ADD COLUMN flow_secret_key VARCHAR(140) NULL AFTER flow_api_key",
+            'flow_modo_sandbox' => "ALTER TABLE configuracion ADD COLUMN flow_modo_sandbox TINYINT(1) NOT NULL DEFAULT 1 AFTER flow_secret_key",
+            'flow_url_confirmacion' => "ALTER TABLE configuracion ADD COLUMN flow_url_confirmacion VARCHAR(255) NULL AFTER flow_modo_sandbox",
+            'flow_url_retorno' => "ALTER TABLE configuracion ADD COLUMN flow_url_retorno VARCHAR(255) NULL AFTER flow_url_confirmacion",
+        ];
+
+        foreach ($required as $column => $sql) {
+            $stmt = $db->prepare('SHOW COLUMNS FROM configuracion LIKE :column_name');
+            $stmt->bindValue(':column_name', $column);
+            $stmt->execute();
+            $exists = $stmt->fetch();
+            if ($exists) {
+                continue;
+            }
+
+            $db->exec($sql);
         }
     }
 

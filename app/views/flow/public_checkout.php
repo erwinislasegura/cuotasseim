@@ -42,6 +42,17 @@
           </div>
         </div>
 
+        <?php if (!empty($result['periodos_pendientes'] ?? [])): ?>
+          <div class="card mb-3">
+            <div class="card-header"><strong>Períodos por pagar</strong></div>
+            <div class="card-body py-2">
+              <?php foreach (($result['periodos_pendientes'] ?? []) as $periodo): ?>
+                <span class="badge bg-secondary me-1 mb-1"><?= htmlspecialchars((string) $periodo) ?></span>
+              <?php endforeach; ?>
+            </div>
+          </div>
+        <?php endif; ?>
+
         <form method="post" action="<?= htmlspecialchars(url('pago-flow/crear')) ?>" id="formPagoFlow">
           <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($token ?? '')) ?>">
           <input type="hidden" name="rut" value="<?= htmlspecialchars((string) ($socio['rut'] ?? $rut ?? '')) ?>">

@@ -136,6 +136,11 @@ class FlowCheckoutController extends Controller
         }
 
         $isAccepted = $status === '2';
+
+        if ($isAccepted && is_array($data)) {
+            $this->registrarPagoAprobadoFlow($token, $data);
+        }
+
         $view = $isAccepted ? 'flow/accepted' : 'flow/rejected';
 
         $this->view($view, [
@@ -177,9 +182,18 @@ class FlowCheckoutController extends Controller
             $total += (float) ($row['saldo_pendiente'] ?? 0);
         }
 
+        $periodosPendientes = [];
+        foreach ($cuotas as $row) {
+            $periodo = trim((string) ($row['periodo'] ?? ''));
+            if ($periodo !== '' && !in_array($periodo, $periodosPendientes, true)) {
+                $periodosPendientes[] = $periodo;
+            }
+        }
+
         return [
             'socio' => $socio,
             'cuotas_pendientes' => $cuotas,
+            'periodos_pendientes' => $periodosPendientes,
             'total_pendiente' => $total,
         ];
     }
@@ -223,6 +237,168 @@ class FlowCheckoutController extends Controller
             'secret_key' => $secretKey,
             'base_url' => $sandbox ? 'https://sandbox.flow.cl/api' : 'https://www.flow.cl/api',
         ];
+    }
+
+
+    private function registrarPagoAprobadoFlow(string $token, array $flowData): void
+    {
+        if ($token === '') {
+            return;
+        }
+
+        $db = Database::connection();
+        $stmtExiste = $db->prepare('SELECT id FROM pagos WHERE referencia_externa = :ref LIMIT 1');
+        $stmtExiste->bindValue(':ref', $token);
+        $stmtExiste->execute();
+        if ($stmtExiste->fetch()) {
+            return;
+        }
+
+        $optional = json_decode((string) ($flowData['optional'] ?? ''), true);
+        if (!is_array($optional)) {
+            return;
+        }
+
+        $socioId = (int) ($optional['socio_id'] ?? 0);
+        $cuotasIds = array_values(array_filter(array_map('intval', (array) ($optional['cuotas_ids'] ?? [])), static fn(int $id): bool => $id > 0));
+        $amount = (float) ($flowData['amount'] ?? 0);
+
+        if ($socioId <= 0 || empty($cuotasIds) || $amount <= 0) {
+            return;
+        }
+
+        $db->beginTransaction();
+        try {
+            $medioPagoId = $this->obtenerMedioPagoFlowId($db);
+
+            $placeholders = implode(',', array_fill(0, count($cuotasIds), '?'));
+            $sqlCuotas = "SELECT c.id, c.saldo_pendiente, c.monto_pagado, c.periodo_id, p.tipo_periodo, p.anio, p.mes, p.fecha_inicio
+                FROM cuotas c
+                LEFT JOIN periodos p ON p.id = c.periodo_id
+                WHERE c.socio_id = ? AND c.id IN ({$placeholders}) AND c.deleted_at IS NULL
+                FOR UPDATE";
+            $stmtCuotas = $db->prepare($sqlCuotas);
+            $stmtCuotas->bindValue(1, $socioId, \PDO::PARAM_INT);
+            foreach ($cuotasIds as $idx => $cuotaId) {
+                $stmtCuotas->bindValue($idx + 2, $cuotaId, \PDO::PARAM_INT);
+            }
+            $stmtCuotas->execute();
+            $cuotas = $stmtCuotas->fetchAll() ?: [];
+            if (empty($cuotas)) {
+                $db->rollBack();
+                return;
+            }
+
+            $cuotasById = [];
+            foreach ($cuotas as $cuota) {
+                $cuotasById[(int) ($cuota['id'] ?? 0)] = $cuota;
+            }
+
+            $periodos = [];
+            foreach ($cuotasIds as $cuotaId) {
+                if (!isset($cuotasById[$cuotaId])) {
+                    continue;
+                }
+                $periodos[] = $this->formatearPeriodoAPagar((array) $cuotasById[$cuotaId]);
+            }
+            $periodoAPagar = implode(', ', array_values(array_unique(array_filter($periodos))));
+
+            $numeroComprobante = 'FLOW-' . date('Ymd-His') . '-' . random_int(100, 999);
+            $stmtPago = $db->prepare("INSERT INTO pagos (socio_id, fecha_pago, monto_total, medio_pago_id, numero_comprobante, referencia_externa, observacion, periodo_a_pagar, estado_pago, usuario_id)
+                VALUES (:socio_id, :fecha_pago, :monto_total, :medio_pago_id, :numero_comprobante, :referencia_externa, :observacion, :periodo_a_pagar, 'aplicado', :usuario_id)");
+            $stmtPago->bindValue(':socio_id', $socioId, \PDO::PARAM_INT);
+            $stmtPago->bindValue(':fecha_pago', date('Y-m-d'));
+            $stmtPago->bindValue(':monto_total', $amount);
+            $stmtPago->bindValue(':medio_pago_id', $medioPagoId, \PDO::PARAM_INT);
+            $stmtPago->bindValue(':numero_comprobante', $numeroComprobante);
+            $stmtPago->bindValue(':referencia_externa', $token);
+            $stmtPago->bindValue(':observacion', 'Pago aprobado por Flow. Orden ' . (string) ($flowData['commerceOrder'] ?? ''));
+            $stmtPago->bindValue(':periodo_a_pagar', $periodoAPagar !== '' ? $periodoAPagar : null);
+            $stmtPago->bindValue(':usuario_id', 1, \PDO::PARAM_INT);
+            $stmtPago->execute();
+
+            $pagoId = (int) $db->lastInsertId();
+            $stmtDetalle = $db->prepare('INSERT INTO pago_detalle (pago_id, cuota_id, monto_aplicado) VALUES (:pago_id, :cuota_id, :monto_aplicado)');
+            $stmtUpdate = $db->prepare('UPDATE cuotas SET monto_pagado = :monto_pagado, saldo_pendiente = :saldo_pendiente, estado_cuota = :estado_cuota WHERE id = :id');
+
+            $remaining = $amount;
+            foreach ($cuotasIds as $cuotaId) {
+                if (!isset($cuotasById[$cuotaId])) {
+                    continue;
+                }
+                $cuota = $cuotasById[$cuotaId];
+                $saldoPendiente = (float) ($cuota['saldo_pendiente'] ?? 0);
+                if ($saldoPendiente <= 0 || $remaining <= 0) {
+                    continue;
+                }
+
+                $abono = min($saldoPendiente, $remaining);
+                $remaining -= $abono;
+
+                $stmtDetalle->bindValue(':pago_id', $pagoId, \PDO::PARAM_INT);
+                $stmtDetalle->bindValue(':cuota_id', $cuotaId, \PDO::PARAM_INT);
+                $stmtDetalle->bindValue(':monto_aplicado', $abono);
+                $stmtDetalle->execute();
+
+                $nuevoPagado = (float) ($cuota['monto_pagado'] ?? 0) + $abono;
+                $nuevoSaldo = max(0, $saldoPendiente - $abono);
+                $estado = $nuevoSaldo <= 0 ? 'pagada' : 'abonada_parcial';
+
+                $stmtUpdate->bindValue(':monto_pagado', $nuevoPagado);
+                $stmtUpdate->bindValue(':saldo_pendiente', $nuevoSaldo);
+                $stmtUpdate->bindValue(':estado_cuota', $estado);
+                $stmtUpdate->bindValue(':id', $cuotaId, \PDO::PARAM_INT);
+                $stmtUpdate->execute();
+            }
+
+            $db->commit();
+        } catch (\Throwable) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+        }
+    }
+
+    private function obtenerMedioPagoFlowId(\PDO $db): int
+    {
+        $stmt = $db->prepare("SELECT id FROM medios_pago WHERE LOWER(nombre) = 'flow' LIMIT 1");
+        $stmt->execute();
+        $id = (int) ($stmt->fetchColumn() ?: 0);
+        if ($id > 0) {
+            return $id;
+        }
+
+        $insert = $db->prepare('INSERT INTO medios_pago (nombre, activo) VALUES (:nombre, 1)');
+        $insert->bindValue(':nombre', 'Flow');
+        $insert->execute();
+
+        return (int) $db->lastInsertId();
+    }
+
+    private function formatearPeriodoAPagar(array $cuota): string
+    {
+        $tipoPeriodo = trim((string) ($cuota['tipo_periodo'] ?? 'mensual'));
+        $mesBase = (int) ($cuota['mes'] ?? 0);
+        if ($mesBase < 1 || $mesBase > 12) {
+            $mesBase = (int) date('n');
+        }
+
+        $anioBase = (int) ($cuota['anio'] ?? 0);
+        if ($anioBase <= 0) {
+            $anioBase = (int) date('Y');
+        }
+
+        $mapMes = [
+            1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril', 5 => 'Mayo', 6 => 'Junio',
+            7 => 'Julio', 8 => 'Agosto', 9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre',
+        ];
+
+        return match ($tipoPeriodo) {
+            'trimestral' => 'Trimestre ' . (int) ceil($mesBase / 3) . ' ' . $anioBase,
+            'semestral' => 'Semestre ' . ($mesBase <= 6 ? 'I' : 'II') . ' ' . $anioBase,
+            'anual' => 'Año ' . $anioBase,
+            default => (($mapMes[$mesBase] ?? 'Mes') . ' ' . $anioBase),
+        };
     }
 
     private function flowRequest(string $path, array $params, array $flowConfig): array
