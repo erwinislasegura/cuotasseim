@@ -42,46 +42,59 @@
           </div>
         </div>
 
-        <div class="card mb-3">
-          <div class="card-header"><strong>Cuotas y conceptos pendientes</strong></div>
-          <div class="table-responsive">
-            <table class="table table-sm mb-0">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Concepto</th>
-                  <th>Período</th>
-                  <th>Vencimiento</th>
-                  <th>Estado</th>
-                  <th class="text-end">Saldo</th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php foreach (($result['cuotas_pendientes'] ?? []) as $cuota): ?>
-                  <tr>
-                    <td>#<?= (int) ($cuota['id'] ?? 0) ?></td>
-                    <td><?= htmlspecialchars((string) ($cuota['concepto'] ?? 'Cuota')) ?></td>
-                    <td><?= htmlspecialchars((string) ($cuota['periodo'] ?? '-')) ?></td>
-                    <td><?= htmlspecialchars((string) ($cuota['fecha_vencimiento'] ?? '-')) ?></td>
-                    <td><?= htmlspecialchars((string) ($cuota['estado_cuota'] ?? '-')) ?></td>
-                    <td class="text-end">$<?= number_format((float) ($cuota['saldo_pendiente'] ?? 0), 0, ',', '.') ?></td>
-                  </tr>
-                <?php endforeach; ?>
-              </tbody>
-              <tfoot>
-                <tr>
-                  <th colspan="5" class="text-end">Total a pagar</th>
-                  <th class="text-end">$<?= number_format((float) ($result['total_pendiente'] ?? 0), 0, ',', '.') ?></th>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-
-        <form method="post" action="<?= htmlspecialchars(url('pago-flow/crear')) ?>">
+        <form method="post" action="<?= htmlspecialchars(url('pago-flow/crear')) ?>" id="formPagoFlow">
           <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($token ?? '')) ?>">
           <input type="hidden" name="rut" value="<?= htmlspecialchars((string) ($socio['rut'] ?? $rut ?? '')) ?>">
-          <button type="submit" class="btn btn-success" <?= !($flowEnabled ?? false) ? 'disabled' : '' ?>>Pagar con Flow</button>
+
+          <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <strong>Cuotas y conceptos sin pagar</strong>
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="seleccionarTodo">Seleccionar todas</button>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm mb-0">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>ID</th>
+                    <th>Concepto</th>
+                    <th>Período</th>
+                    <th>Vencimiento</th>
+                    <th>Estado</th>
+                    <th class="text-end">Saldo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach (($result['cuotas_pendientes'] ?? []) as $cuota): ?>
+                    <?php $saldo = (float) ($cuota['saldo_pendiente'] ?? 0); ?>
+                    <tr>
+                      <td>
+                        <input class="form-check-input cuota-check" type="checkbox" name="cuotas_ids[]" value="<?= (int) ($cuota['id'] ?? 0) ?>" data-monto="<?= htmlspecialchars((string) $saldo) ?>">
+                      </td>
+                      <td>#<?= (int) ($cuota['id'] ?? 0) ?></td>
+                      <td><?= htmlspecialchars((string) ($cuota['concepto'] ?? 'Cuota')) ?></td>
+                      <td><?= htmlspecialchars((string) ($cuota['periodo'] ?? '-')) ?></td>
+                      <td><?= htmlspecialchars((string) ($cuota['fecha_vencimiento'] ?? '-')) ?></td>
+                      <td><?= htmlspecialchars((string) ($cuota['estado_cuota'] ?? '-')) ?></td>
+                      <td class="text-end">$<?= number_format($saldo, 0, ',', '.') ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th colspan="6" class="text-end">Total seleccionado</th>
+                    <th class="text-end" id="totalSeleccionado">$0</th>
+                  </tr>
+                  <tr>
+                    <th colspan="6" class="text-end">Total pendiente</th>
+                    <th class="text-end">$<?= number_format((float) ($result['total_pendiente'] ?? 0), 0, ',', '.') ?></th>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-success" id="btnPagarFlow" <?= !($flowEnabled ?? false) ? 'disabled' : '' ?>>Pagar selección con Flow</button>
           <?php if (!($flowEnabled ?? false)): ?>
             <p class="small text-muted mt-2 mb-0">Flow está deshabilitado o faltan credenciales en Configuración.</p>
           <?php endif; ?>
@@ -90,3 +103,35 @@
     </div>
   </div>
 </section>
+
+<script>
+  (function () {
+    const checks = Array.from(document.querySelectorAll('.cuota-check'));
+    const totalEl = document.getElementById('totalSeleccionado');
+    const toggleAllBtn = document.getElementById('seleccionarTodo');
+
+    const formatClp = (value) => '$' + new Intl.NumberFormat('es-CL').format(Math.round(value || 0));
+
+    const refreshTotal = () => {
+      const total = checks.reduce((acc, input) => {
+        if (!input.checked) return acc;
+        const amount = parseFloat(input.dataset.monto || '0');
+        return acc + (isNaN(amount) ? 0 : amount);
+      }, 0);
+      if (totalEl) totalEl.textContent = formatClp(total);
+    };
+
+    checks.forEach((input) => input.addEventListener('change', refreshTotal));
+
+    if (toggleAllBtn) {
+      toggleAllBtn.addEventListener('click', () => {
+        const allChecked = checks.length > 0 && checks.every((item) => item.checked);
+        checks.forEach((item) => { item.checked = !allChecked; });
+        toggleAllBtn.textContent = allChecked ? 'Seleccionar todas' : 'Quitar selección';
+        refreshTotal();
+      });
+    }
+
+    refreshTotal();
+  })();
+</script>

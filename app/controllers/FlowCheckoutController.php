@@ -48,31 +48,56 @@ class FlowCheckoutController extends Controller
             $this->redirect('/pago-flow?rut=' . urlencode($rut));
         }
 
-        $amount = (float) ($result['total_pendiente'] ?? 0);
+        $selectedIds = array_map('intval', (array) ($_POST['cuotas_ids'] ?? []));
+        $selectedIds = array_values(array_filter(array_unique($selectedIds), static fn(int $id): bool => $id > 0));
+        if (empty($selectedIds)) {
+            $_SESSION['flow_error'] = 'Debes seleccionar al menos una cuota para pagar.';
+            $this->redirect('/pago-flow?rut=' . urlencode($rut));
+        }
+
+        $cuotasPendientes = $this->pendingCuotasBySocioId((int) ($result['socio']['id'] ?? 0));
+        $allowedById = [];
+        foreach ($cuotasPendientes as $cuota) {
+            $allowedById[(int) ($cuota['id'] ?? 0)] = $cuota;
+        }
+
+        $selectedCuotas = [];
+        $amount = 0.0;
+        foreach ($selectedIds as $cuotaId) {
+            if (!isset($allowedById[$cuotaId])) {
+                $_SESSION['flow_error'] = 'Una de las cuotas seleccionadas no está disponible para pago.';
+                $this->redirect('/pago-flow?rut=' . urlencode($rut));
+            }
+            $selectedCuotas[] = $allowedById[$cuotaId];
+            $amount += (float) ($allowedById[$cuotaId]['saldo_pendiente'] ?? 0);
+        }
+
         if ($amount <= 0) {
-            $_SESSION['flow_error'] = 'El monto a pagar no es válido.';
+            $_SESSION['flow_error'] = 'El monto seleccionado no es válido.';
             $this->redirect('/pago-flow?rut=' . urlencode($rut));
         }
 
         $socio = $result['socio'];
         $commerceOrder = 'SOCIO-' . (int) ($socio['id'] ?? 0) . '-' . date('YmdHis');
         $subject = 'Pago cuotas socio ' . trim((string) ($socio['nombre_completo'] ?? ''));
-        $apiResponse = $this->requestFlowCreatePayment(
-            $flowConfig,
-            [
-                'commerceOrder' => $commerceOrder,
-                'subject' => mb_substr($subject, 0, 140),
-                'currency' => 'CLP',
-                'amount' => (string) (int) round($amount),
-                'email' => (string) ($socio['correo'] ?? ''),
-                'urlConfirmation' => $flowConfig['confirmation_url'],
-                'urlReturn' => $flowConfig['return_url'],
-                'optional' => json_encode([
-                    'socio_id' => (int) ($socio['id'] ?? 0),
-                    'rut' => (string) ($socio['rut'] ?? ''),
-                ], JSON_UNESCAPED_UNICODE),
-            ]
-        );
+
+        $optionalPayload = [
+            'socio_id' => (int) ($socio['id'] ?? 0),
+            'rut' => (string) ($socio['rut'] ?? ''),
+            'cuotas_ids' => array_values(array_map(static fn(array $item): int => (int) ($item['id'] ?? 0), $selectedCuotas)),
+        ];
+
+        $apiResponse = $this->flowRequest('/payment/create', [
+            'apiKey' => $flowConfig['api_key'],
+            'commerceOrder' => $commerceOrder,
+            'subject' => mb_substr($subject, 0, 140),
+            'currency' => 'CLP',
+            'amount' => (string) (int) round($amount),
+            'email' => (string) ($socio['correo'] ?? ''),
+            'urlConfirmation' => url('pago-flow/retorno'),
+            'urlReturn' => url('pago-flow/retorno'),
+            'optional' => json_encode($optionalPayload, JSON_UNESCAPED_UNICODE),
+        ], $flowConfig);
 
         if (!$apiResponse['ok']) {
             $_SESSION['flow_error'] = $apiResponse['message'];
@@ -91,6 +116,44 @@ class FlowCheckoutController extends Controller
         $this->redirect($paymentUrl . $separator . 'token=' . urlencode($token));
     }
 
+    public function retorno(): void
+    {
+        $token = trim((string) ($_GET['token'] ?? ''));
+        $status = trim((string) ($_GET['status'] ?? ''));
+        $flowConfig = $this->flowConfig();
+
+        $data = null;
+        if ($token !== '' && $flowConfig['enabled']) {
+            $response = $this->flowRequest('/payment/getStatus', [
+                'apiKey' => $flowConfig['api_key'],
+                'token' => $token,
+            ], $flowConfig);
+
+            if ($response['ok']) {
+                $data = $response['data'];
+                $status = (string) ($data['status'] ?? $status);
+            }
+        }
+
+        $isAccepted = $status === '2';
+        $view = $isAccepted ? 'flow/accepted' : 'flow/rejected';
+
+        $this->view($view, [
+            'title' => $isAccepted ? 'Pago aceptado' : 'Pago rechazado',
+            'status' => $status,
+            'payment' => is_array($data) ? $data : [],
+        ], 'landing');
+    }
+
+    public function rejected(): void
+    {
+        $this->view('flow/rejected', [
+            'title' => 'Pago rechazado',
+            'status' => (string) ($_GET['status'] ?? ''),
+            'payment' => [],
+        ], 'landing');
+    }
+
     private function findSocioDataByRut(string $rutInput): ?array
     {
         $normalizedRut = $this->normalizeRut($rutInput);
@@ -107,10 +170,7 @@ class FlowCheckoutController extends Controller
             return null;
         }
 
-        $stmtCuotas = Database::connection()->prepare('SELECT c.id, c.estado_cuota, c.saldo_pendiente, c.fecha_vencimiento, COALESCE(cc.nombre, "Cuota") AS concepto, COALESCE(p.nombre_periodo, CONCAT(COALESCE(p.anio, ""), "-", LPAD(COALESCE(p.mes, 0), 2, "0"))) AS periodo FROM cuotas c LEFT JOIN conceptos_cobro cc ON cc.id = c.concepto_cobro_id LEFT JOIN periodos p ON p.id = c.periodo_id WHERE c.socio_id = :socio_id AND c.estado_cuota IN ("pendiente", "vencida", "abonada_parcial") AND COALESCE(c.saldo_pendiente, 0) > 0 ORDER BY c.fecha_vencimiento ASC, c.id ASC');
-        $stmtCuotas->bindValue(':socio_id', (int) $socio['id'], \PDO::PARAM_INT);
-        $stmtCuotas->execute();
-        $cuotas = $stmtCuotas->fetchAll() ?: [];
+        $cuotas = $this->pendingCuotasBySocioId((int) ($socio['id'] ?? 0));
 
         $total = 0.0;
         foreach ($cuotas as $row) {
@@ -122,6 +182,19 @@ class FlowCheckoutController extends Controller
             'cuotas_pendientes' => $cuotas,
             'total_pendiente' => $total,
         ];
+    }
+
+    private function pendingCuotasBySocioId(int $socioId): array
+    {
+        if ($socioId <= 0) {
+            return [];
+        }
+
+        $stmtCuotas = Database::connection()->prepare('SELECT c.id, c.estado_cuota, c.saldo_pendiente, c.fecha_vencimiento, COALESCE(cc.nombre, "Cuota") AS concepto, COALESCE(p.nombre_periodo, CONCAT(COALESCE(p.anio, ""), "-", LPAD(COALESCE(p.mes, 0), 2, "0"))) AS periodo FROM cuotas c LEFT JOIN conceptos_cobro cc ON cc.id = c.concepto_cobro_id LEFT JOIN periodos p ON p.id = c.periodo_id WHERE c.socio_id = :socio_id AND c.estado_cuota IN ("pendiente", "vencida", "abonada_parcial") AND COALESCE(c.saldo_pendiente, 0) > 0 ORDER BY c.fecha_vencimiento ASC, c.id ASC');
+        $stmtCuotas->bindValue(':socio_id', $socioId, \PDO::PARAM_INT);
+        $stmtCuotas->execute();
+
+        return $stmtCuotas->fetchAll() ?: [];
     }
 
     private function normalizeRut(string $rut): string
@@ -140,37 +213,27 @@ class FlowCheckoutController extends Controller
         $stmt = Database::connection()->query('SELECT * FROM configuracion ORDER BY id ASC LIMIT 1');
         $row = $stmt->fetch() ?: [];
 
-        $enabled = (int) ($row['flow_checkout_activo'] ?? 0) === 1;
         $apiKey = trim((string) ($row['flow_api_key'] ?? ''));
         $secretKey = trim((string) ($row['flow_secret_key'] ?? ''));
         $sandbox = (int) ($row['flow_modo_sandbox'] ?? 1) === 1;
 
-        $defaultConfirmation = url('pago-flow');
-        $defaultReturn = url('pago-flow');
-
         return [
-            'enabled' => $enabled && $apiKey !== '' && $secretKey !== '',
+            'enabled' => $apiKey !== '' && $secretKey !== '',
             'api_key' => $apiKey,
             'secret_key' => $secretKey,
-            'sandbox' => $sandbox,
             'base_url' => $sandbox ? 'https://sandbox.flow.cl/api' : 'https://www.flow.cl/api',
-            'confirmation_url' => trim((string) ($row['flow_url_confirmacion'] ?? '')) ?: $defaultConfirmation,
-            'return_url' => trim((string) ($row['flow_url_retorno'] ?? '')) ?: $defaultReturn,
         ];
     }
 
-    private function requestFlowCreatePayment(array $flowConfig, array $payload): array
+    private function flowRequest(string $path, array $params, array $flowConfig): array
     {
-        $params = array_merge([
-            'apiKey' => $flowConfig['api_key'],
-        ], $payload);
+        $signatureData = $params;
+        unset($signatureData['s']);
+        ksort($signatureData);
+        $toSign = http_build_query($signatureData);
+        $params['s'] = hash_hmac('sha256', $toSign, (string) $flowConfig['secret_key']);
 
-        ksort($params);
-        $toSign = http_build_query($params);
-        $signature = hash_hmac('sha256', $toSign, (string) $flowConfig['secret_key']);
-        $params['s'] = $signature;
-
-        $ch = curl_init((string) ($flowConfig['base_url'] . '/payment/create'));
+        $ch = curl_init((string) ($flowConfig['base_url'] . $path));
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
@@ -194,7 +257,7 @@ class FlowCheckoutController extends Controller
         }
 
         if ($statusCode >= 400 || isset($decoded['code'])) {
-            $message = (string) ($decoded['message'] ?? 'Error al crear pago en Flow.');
+            $message = (string) ($decoded['message'] ?? 'Error al procesar solicitud con Flow.');
             return ['ok' => false, 'message' => $message, 'data' => $decoded];
         }
 

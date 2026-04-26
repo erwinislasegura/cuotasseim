@@ -133,24 +133,9 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
         <?php if (($route ?? '') === 'configuracion'): ?>
           <div class="col-12">
             <div class="alert alert-info small mb-2">
-              <strong>Flow Checkout:</strong> completa <code>flow_checkout_activo</code>, <code>flow_api_key</code>, <code>flow_secret_key</code>, <code>flow_modo_sandbox</code>, <code>flow_url_confirmacion</code> y <code>flow_url_retorno</code>.
+              <strong>Configuración Flow:</strong> ingresa Flow Api Key, Flow Secret Key y define si usarás Sandbox.
               <br>Vista pública de pago: <a href="<?= htmlspecialchars(url('pago-flow')) ?>" target="_blank" rel="noopener"><?= htmlspecialchars(url('pago-flow')) ?></a>.
             </div>
-          </div>
-          <div class="col-12">
-            <label class="form-label">Logo institucional</label>
-            <input type="file" name="logo_file" class="form-control form-control-sm" accept=".png,.jpg,.jpeg,.webp,.svg,image/*">
-            <?php $logoActual = trim((string) ($currentRecord['logo'] ?? '')); ?>
-            <?php if ($logoActual !== ''): ?>
-              <div class="d-flex align-items-center gap-2 mt-2">
-                <img src="<?= htmlspecialchars(url($logoActual)) ?>" alt="Logo actual" style="max-height:42px; width:auto;">
-                <div class="form-check m-0">
-                  <input class="form-check-input" type="checkbox" value="1" id="eliminarLogo" name="eliminar_logo">
-                  <label class="form-check-label small" for="eliminarLogo">Eliminar logo actual</label>
-                </div>
-              </div>
-            <?php endif; ?>
-            <small class="text-muted">Se recomienda PNG transparente o SVG.</small>
           </div>
         <?php endif; ?>
 

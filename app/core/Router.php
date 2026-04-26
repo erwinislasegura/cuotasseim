@@ -14,6 +14,8 @@ class Router
         '/login',
         '/pago-flow',
         '/pago-flow/crear',
+        '/pago-flow/retorno',
+        '/pago-flow/rechazado',
     ];
 
     public function dispatch(string $method, string $uri): void
