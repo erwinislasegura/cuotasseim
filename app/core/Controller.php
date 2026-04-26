@@ -347,6 +347,11 @@ abstract class Controller
 
                 if (!$isReadOnly && $action === 'save') {
                     if (($config['route'] ?? '') === 'configuracion') {
+                        if (($id ?? 0) <= 0) {
+                            $stmtConfigId = Database::connection()->query('SELECT id FROM configuracion ORDER BY id ASC LIMIT 1');
+                            $id = (int) ($stmtConfigId->fetchColumn() ?: 0);
+                        }
+
                         $removeLogo = (string) ($_POST['eliminar_logo'] ?? '') === '1';
                         if ($removeLogo) {
                             $_POST['logo'] = '';
@@ -550,6 +555,10 @@ abstract class Controller
                 $viewRecordDisplay = ModuleCatalog::decorateRecordForDisplay($config['table'], $viewRecord);
             }
 
+            if ($config['table'] === 'configuracion' && $currentRecord === null) {
+                $stmtConfigActual = Database::connection()->query('SELECT * FROM configuracion ORDER BY id ASC LIMIT 1');
+                $currentRecord = $stmtConfigActual->fetch() ?: null;
+            }
 
             if ($config['table'] === 'periodos') {
                 $formFields = array_values(array_intersect([
@@ -595,6 +604,7 @@ abstract class Controller
                     'direccion',
                     'telefono',
                     'correo',
+                    'sitio_web',
                     'flow_api_key',
                     'flow_secret_key',
                     'flow_modo_sandbox',
@@ -602,6 +612,7 @@ abstract class Controller
                 $formMeta = [
                     'types' => [
                         'correo' => 'email',
+                        'sitio_web' => 'url',
                         'flow_modo_sandbox' => 'select',
                     ],
                     'options' => [
@@ -612,31 +623,22 @@ abstract class Controller
                     ],
                     'labels' => [
                         'nombre_organizacion' => 'Nombre institución',
-                        'nombre_sistema' => 'Nombre del sistema',
+                        'nombre_sistema' => 'Nombre sistema',
                         'rut_organizacion' => 'RUT institución',
-                        'direccion' => 'Dirección institucional',
-                        'telefono' => 'Teléfono institucional',
-                        'correo' => 'Correo institucional',
+                        'direccion' => 'Dirección',
+                        'telefono' => 'Teléfono',
+                        'correo' => 'Correo',
+                        'sitio_web' => 'Sitio web',
+                        'logo' => 'Logo institucional',
                         'flow_api_key' => 'Flow Api Key',
                         'flow_secret_key' => 'Flow Secret Key',
                         'flow_modo_sandbox' => 'Flow Modo Sandbox',
-                    ],
-                    'required' => [
-                        'nombre_organizacion' => true,
-                        'nombre_sistema' => true,
-                        'rut_organizacion' => true,
-                        'direccion' => true,
-                        'telefono' => true,
-                        'correo' => true,
-                        'flow_api_key' => true,
-                        'flow_secret_key' => true,
-                        'flow_modo_sandbox' => true,
                     ],
                 ];
                 $columnLabels = $formMeta['labels'];
             }
 
-            if ($config['table'] === 'socios') {
+                                    if ($config['table'] === 'socios') {
                 $availableFormFields = array_values(array_intersect([
                     'numero_socio',
                     'rut',
@@ -1211,12 +1213,9 @@ abstract class Controller
         $db = Database::connection();
 
         $required = [
-            'flow_checkout_activo' => "ALTER TABLE configuracion ADD COLUMN flow_checkout_activo TINYINT(1) NOT NULL DEFAULT 0 AFTER sitio_web",
-            'flow_api_key' => "ALTER TABLE configuracion ADD COLUMN flow_api_key VARCHAR(120) NULL AFTER flow_checkout_activo",
+            'flow_api_key' => "ALTER TABLE configuracion ADD COLUMN flow_api_key VARCHAR(120) NULL AFTER sitio_web",
             'flow_secret_key' => "ALTER TABLE configuracion ADD COLUMN flow_secret_key VARCHAR(140) NULL AFTER flow_api_key",
             'flow_modo_sandbox' => "ALTER TABLE configuracion ADD COLUMN flow_modo_sandbox TINYINT(1) NOT NULL DEFAULT 1 AFTER flow_secret_key",
-            'flow_url_confirmacion' => "ALTER TABLE configuracion ADD COLUMN flow_url_confirmacion VARCHAR(255) NULL AFTER flow_modo_sandbox",
-            'flow_url_retorno' => "ALTER TABLE configuracion ADD COLUMN flow_url_retorno VARCHAR(255) NULL AFTER flow_url_confirmacion",
         ];
 
         foreach ($required as $column => $sql) {
