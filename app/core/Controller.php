@@ -378,19 +378,28 @@ abstract class Controller
 
                     $isUpdate = $id !== null && $id > 0;
                     $previousRecord = $isUpdate ? ModuleCatalog::findById($config['table'], $primaryKey, $id) : null;
+                    if ($isUpdate && $previousRecord === null) {
+                        $isUpdate = false;
+                        $id = null;
+                    }
+
                     $savedId = ModuleCatalog::save($config['table'], $primaryKey, $columnsMeta['form'], $_POST, $isUpdate ? $id : null);
                     $targetId = $savedId > 0 ? $savedId : ($isUpdate ? (int) $id : 0);
                     $currentRecord = $targetId > 0 ? ModuleCatalog::findById($config['table'], $primaryKey, $targetId) : null;
 
-                    ModuleCatalog::registerAudit(
-                        (string) ($config['route'] ?? $moduleKey),
-                        $isUpdate ? 'actualizar' : 'crear',
-                        $targetId > 0 ? $targetId : null,
-                        is_array($previousRecord) ? $previousRecord : null,
-                        is_array($currentRecord) ? $currentRecord : null
-                    );
+                    if ($savedId > 0) {
+                        ModuleCatalog::registerAudit(
+                            (string) ($config['route'] ?? $moduleKey),
+                            $isUpdate ? 'actualizar' : 'crear',
+                            $targetId > 0 ? $targetId : null,
+                            is_array($previousRecord) ? $previousRecord : null,
+                            is_array($currentRecord) ? $currentRecord : null
+                        );
 
-                    $_SESSION['flash_success'] = $isUpdate ? 'Registro actualizado correctamente.' : 'Registro creado correctamente.';
+                        $_SESSION['flash_success'] = $isUpdate ? 'Registro actualizado correctamente.' : 'Registro creado correctamente.';
+                    } else {
+                        $_SESSION['flash_error'] = 'No se pudo guardar el registro. Verifica que los campos obligatorios tengan datos.';
+                    }
                 }
 
                 if (!$isReadOnly && $action === 'delete' && $id !== null && $id > 0) {
@@ -1212,6 +1221,28 @@ abstract class Controller
     {
         try {
             $db = Database::connection();
+            $db->exec("
+                CREATE TABLE IF NOT EXISTS configuracion (
+                    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                    nombre_organizacion VARCHAR(140) NULL,
+                    nombre_sistema VARCHAR(140) NULL,
+                    logo VARCHAR(255) NULL,
+                    rut_organizacion VARCHAR(30) NULL,
+                    direccion VARCHAR(255) NULL,
+                    telefono VARCHAR(40) NULL,
+                    correo VARCHAR(120) NULL,
+                    sitio_web VARCHAR(120) NULL,
+                    flow_api_key VARCHAR(120) NULL,
+                    flow_secret_key VARCHAR(140) NULL,
+                    flow_modo_sandbox TINYINT(1) NOT NULL DEFAULT 1,
+                    cuota_por_defecto DECIMAL(12,2) DEFAULT 0,
+                    moneda VARCHAR(20) DEFAULT 'CLP',
+                    simbolo_moneda VARCHAR(5) DEFAULT '$',
+                    texto_comprobante TEXT NULL,
+                    observaciones_generales TEXT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
 
             $required = [
                 'flow_api_key' => "ALTER TABLE configuracion ADD COLUMN flow_api_key VARCHAR(120) NULL AFTER sitio_web",
