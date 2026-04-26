@@ -30,7 +30,6 @@ $menu = [
     ],
     'Gestión' => [
         ['route' => 'reportes', 'label' => 'Reportes', 'icon' => 'bi-bar-chart'],
-        ['route' => 'auditoria', 'label' => 'Auditoría', 'icon' => 'bi-shield-lock'],
         ['route' => 'usuarios', 'label' => 'Usuarios', 'icon' => 'bi-person-gear'],
         ['route' => 'roles', 'label' => 'Roles', 'icon' => 'bi-person-badge'],
         ['route' => 'configuracion', 'label' => 'Configuración', 'icon' => 'bi-sliders'],

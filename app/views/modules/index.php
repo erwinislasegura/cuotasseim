@@ -41,10 +41,6 @@ $moduleHighlights = [
     'title' => 'Enfoque ejecutivo',
     'text' => 'Consolida ingresos y egresos para análisis financiero mensual, trimestral y anual.',
   ],
-  'auditoria' => [
-    'title' => 'Control y trazabilidad',
-    'text' => 'Revisa acciones por usuario, módulo y fecha para seguimiento y cumplimiento.',
-  ],
   'pagos' => [
     'title' => 'Control de recaudación',
     'text' => 'Valida comprobantes, estado de aplicación y consistencia de cobros registrados.',

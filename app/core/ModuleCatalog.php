@@ -30,7 +30,6 @@ class ModuleCatalog
             'roles' => ['title' => 'Roles', 'description' => 'Administración de perfiles de acceso.', 'table' => 'roles', 'route' => 'roles'],
             'usuarios' => ['title' => 'Usuarios', 'description' => 'Gestión de usuarios y permisos operativos.', 'table' => 'usuarios', 'route' => 'usuarios'],
             'configuracion' => ['title' => 'Configuración general', 'description' => 'Parámetros institucionales y reglas base del sistema.', 'table' => 'configuracion', 'route' => 'configuracion'],
-            'auditoria' => ['title' => 'Auditoría', 'description' => 'Trazabilidad por módulo, usuario y acción.', 'table' => 'auditoria', 'route' => 'auditoria', 'read_only' => true],
             'reportes' => ['title' => 'Reportes', 'description' => 'Reportería financiera consolidada con enfoque ejecutivo y operativo.', 'table' => 'movimientos_tesoreria', 'route' => 'reportes', 'read_only' => true],
         ];
 

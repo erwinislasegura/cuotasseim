@@ -44,5 +44,4 @@ return [
     ['GET', '/reportes', 'ReportesController@index'],
     ['GET', '/configuracion', 'ConfiguracionController@index'],
     ['POST', '/configuracion', 'ConfiguracionController@index'],
-    ['GET', '/auditoria', 'AuditoriaController@index'],
 ];
