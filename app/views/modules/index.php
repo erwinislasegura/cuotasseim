@@ -599,12 +599,12 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
         </a>
       </div>
     <?php endif; ?>
-    <form method="get" action="<?= htmlspecialchars(url($route ?? '')) ?>" class="row gx-2 gy-2 align-items-end">
-      <div class="col-sm-auto">
+    <form method="get" action="<?= htmlspecialchars(url($route ?? '')) ?>" class="row gx-2 gy-2 align-items-end <?= ($route ?? '') === 'reportes' ? 'report-filters' : '' ?>">
+      <div class="col-sm-auto filter-search">
         <label class="form-label">Buscar</label>
         <input type="text" name="q" value="<?= htmlspecialchars($query ?? '') ?>" class="form-control form-control-sm" placeholder="Buscar...">
       </div>
-      <div class="col-sm-auto">
+      <div class="col-sm-auto filter-status">
         <label class="form-label">Estado</label>
         <select name="status" class="form-select form-select-sm">
           <option value="">Todos</option>
@@ -613,16 +613,16 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
           <?php endforeach; ?>
         </select>
       </div>
-      <div class="col-sm-auto">
+      <div class="col-sm-auto filter-date">
         <label class="form-label">Desde</label>
         <input type="date" name="from" class="form-control form-control-sm" value="<?= htmlspecialchars((string) ($from ?? '')) ?>">
       </div>
-      <div class="col-sm-auto">
+      <div class="col-sm-auto filter-date">
         <label class="form-label">Hasta</label>
         <input type="date" name="to" class="form-control form-control-sm" value="<?= htmlspecialchars((string) ($to ?? '')) ?>">
       </div>
       <?php if (($route ?? '') === 'reportes'): ?>
-        <div class="col-sm-auto">
+        <div class="col-sm-auto filter-periodo">
           <label class="form-label">Periodo</label>
           <select name="periodo" class="form-select form-select-sm">
             <?php foreach (($formMeta['reportes_filter_options']['periodos'] ?? []) as $periodOption): ?>
@@ -633,7 +633,7 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
             <?php endforeach; ?>
           </select>
         </div>
-        <div class="col-sm-auto">
+        <div class="col-sm-auto filter-socio">
           <label class="form-label">Socio</label>
           <select name="socio_id" class="form-select form-select-sm">
             <option value="">Todos</option>
@@ -645,7 +645,7 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
             <?php endforeach; ?>
           </select>
         </div>
-        <div class="col-sm-auto">
+        <div class="col-sm-auto filter-movimiento">
           <label class="form-label">Movimiento</label>
           <select name="origen_modulo" class="form-select form-select-sm">
             <?php foreach (($formMeta['reportes_filter_options']['origenes'] ?? []) as $option): ?>
@@ -656,16 +656,16 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
             <?php endforeach; ?>
           </select>
         </div>
-        <div class="col-sm-auto">
+        <div class="col-sm-auto filter-monto">
           <label class="form-label">Monto min</label>
           <input type="number" step="0.01" min="0" name="monto_min" value="<?= htmlspecialchars((string) ($extraFilters['monto_min'] ?? '')) ?>" class="form-control form-control-sm" placeholder="0">
         </div>
-        <div class="col-sm-auto">
+        <div class="col-sm-auto filter-monto">
           <label class="form-label">Monto máx</label>
           <input type="number" step="0.01" min="0" name="monto_max" value="<?= htmlspecialchars((string) ($extraFilters['monto_max'] ?? '')) ?>" class="form-control form-control-sm" placeholder="0">
         </div>
       <?php endif; ?>
-      <div class="col-sm-auto d-flex gap-2">
+      <div class="col-sm-auto d-flex gap-2 filter-actions">
         <button class="btn btn-outline-secondary btn-sm" type="submit">Filtrar</button>
         <a class="btn btn-light btn-sm" href="<?= htmlspecialchars(url($route ?? '')) ?>">Limpiar</a>
       </div>

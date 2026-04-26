@@ -1337,18 +1337,29 @@ abstract class Controller
         $queryLower = mb_strtolower(trim($query));
 
         $filtered = array_values(array_filter($allRows, static function (array $row) use ($status, $socioFilter, $socioFilterRut, $socioFilterNombre, $montoMin, $montoMax, $origenFiltro, $queryLower): bool {
-            $tipo = (string) ($row['tipo_movimiento'] ?? '');
-            if ($status !== '' && $tipo !== $status) {
+            $tipo = mb_strtolower(trim((string) ($row['tipo_movimiento'] ?? '')));
+            $statusFilter = mb_strtolower(trim((string) $status));
+            if ($statusFilter !== '' && $tipo !== $statusFilter) {
                 return false;
             }
             if ($origenFiltro !== '') {
                 $origenTexto = mb_strtolower(trim((string) ($row['origen_modulo'] ?? '')));
                 $origenNormalizado = 'manual';
-                if (str_contains($origenTexto, 'pago')) {
+                if (
+                    str_contains($origenTexto, 'pago')
+                    || str_contains($origenTexto, 'cuota')
+                ) {
                     $origenNormalizado = 'pago_cuotas';
-                } elseif (str_contains($origenTexto, 'aporte')) {
+                } elseif (
+                    str_contains($origenTexto, 'aporte')
+                    || str_contains($origenTexto, 'abono')
+                ) {
                     $origenNormalizado = 'aporte';
-                } elseif (str_contains($origenTexto, 'retiro') || str_contains($origenTexto, 'egreso')) {
+                } elseif (
+                    str_contains($origenTexto, 'retiro')
+                    || str_contains($origenTexto, 'egreso')
+                    || str_contains($origenTexto, 'gasto')
+                ) {
                     $origenNormalizado = 'retiro';
                 }
                 if ($origenNormalizado !== $origenFiltro) {

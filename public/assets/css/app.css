@@ -195,6 +195,26 @@ body {
 .btn-outline-secondary { border-color: #c8d3df; color: #3f556d; }
 .btn-light { background: #f9fbfe; border-color: #dce6f1; }
 
+.report-filters .filter-search .form-control { min-width: 220px; }
+.report-filters .filter-status .form-select { min-width: 130px; }
+.report-filters .filter-date .form-control { min-width: 145px; }
+.report-filters .filter-periodo .form-select { min-width: 170px; }
+.report-filters .filter-socio .form-select { min-width: 290px; }
+.report-filters .filter-movimiento .form-select { min-width: 170px; }
+.report-filters .filter-monto .form-control { min-width: 120px; }
+
+@media (max-width: 768px) {
+  .report-filters .col-sm-auto {
+    width: 100%;
+  }
+
+  .report-filters .form-control,
+  .report-filters .form-select {
+    min-width: 0 !important;
+    width: 100%;
+  }
+}
+
 .egreso-flow-hint {
   border: 1px dashed #c8d8ea;
   background: #f7fbff;
