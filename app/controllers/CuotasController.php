@@ -300,7 +300,8 @@ class CuotasController extends Controller
 
         $monto = (float) ($plan['monto_a_pagar'] ?? 0);
         $tipo = (string) ($plan['tipo_periodo'] ?? 'mensual');
-        $fechaVencimiento = $this->fechaVencimientoPeriodoActual($tipo);
+        $periodoId = (int) ($plan['periodo_id'] ?? 0);
+        $fechaVencimiento = $this->obtenerFechaVencimientoProgresiva($db, $socioId, $periodoId, $tipo);
 
         $stmtExiste = $db->prepare("SELECT id FROM cuotas
             WHERE socio_id = :socio_id
@@ -336,11 +337,12 @@ class CuotasController extends Controller
     private function formatearPeriodoAPagar(array $cuota): string
     {
         $tipoPeriodo = trim((string) ($cuota['tipo_periodo'] ?? 'mensual'));
-        $mesBase = (int) ($cuota['mes'] ?? 0);
+        $fechaBaseTexto = (string) ($cuota['fecha_vencimiento'] ?? $cuota['fecha_inicio'] ?? 'now');
+        $mesBase = (int) date('n', strtotime($fechaBaseTexto));
         if ($mesBase < 1 || $mesBase > 12) {
             $mesBase = (int) date('n', strtotime((string) ($cuota['fecha_inicio'] ?? $cuota['fecha_vencimiento'] ?? 'now')));
         }
-        $anioBase = (int) ($cuota['anio'] ?? 0);
+        $anioBase = (int) date('Y', strtotime($fechaBaseTexto));
         if ($anioBase <= 0) {
             $anioBase = (int) date('Y', strtotime((string) ($cuota['fecha_inicio'] ?? $cuota['fecha_vencimiento'] ?? 'now')));
         }
@@ -369,7 +371,7 @@ class CuotasController extends Controller
 
     private function obtenerCuotaActualDesdePlan(\PDO $db, int $socioId): ?array
     {
-        $stmt = $db->prepare("SELECT p.nombre_periodo, p.tipo_periodo, p.monto_a_pagar
+        $stmt = $db->prepare("SELECT p.id AS periodo_id, p.nombre_periodo, p.tipo_periodo, p.monto_a_pagar
             FROM socio_planes sp
             INNER JOIN periodos p ON p.id = sp.periodo_id
             WHERE sp.socio_id = :socio_id
@@ -391,9 +393,16 @@ class CuotasController extends Controller
         $tipo = (string) ($plan['tipo_periodo'] ?? 'mensual');
         $monto = (float) ($plan['monto_a_pagar'] ?? 0);
 
+        $fechaVencimiento = $this->obtenerFechaVencimientoProgresiva(
+            $db,
+            $socioId,
+            (int) ($plan['periodo_id'] ?? 0),
+            $tipo
+        );
+
         return [
             'id' => null,
-            'fecha_vencimiento' => $this->fechaVencimientoPeriodoActual($tipo),
+            'fecha_vencimiento' => $fechaVencimiento,
             'estado_cuota' => 'pendiente',
             'monto_total' => $monto,
             'monto_pagado' => 0,
@@ -425,6 +434,46 @@ class CuotasController extends Controller
         }
 
         return date('Y-m-t');
+    }
+
+    private function obtenerFechaVencimientoProgresiva(\PDO $db, int $socioId, int $periodoId, string $tipoPeriodo): string
+    {
+        if ($socioId <= 0 || $periodoId <= 0) {
+            return $this->fechaVencimientoPeriodoActual($tipoPeriodo);
+        }
+
+        $stmtSocio = $db->prepare('SELECT fecha_ingreso FROM socios WHERE id = :id LIMIT 1');
+        $stmtSocio->bindValue(':id', $socioId, \PDO::PARAM_INT);
+        $stmtSocio->execute();
+        $fechaIngreso = (string) ($stmtSocio->fetchColumn() ?: '');
+
+        $base = $fechaIngreso !== '' ? new \DateTimeImmutable($fechaIngreso) : new \DateTimeImmutable('today');
+        $base = $base->modify('first day of this month');
+
+        $stmtCount = $db->prepare("SELECT COUNT(*)
+            FROM cuotas
+            WHERE socio_id = :socio_id
+              AND periodo_id = :periodo_id
+              AND deleted_at IS NULL
+              AND estado_cuota <> 'anulada'");
+        $stmtCount->bindValue(':socio_id', $socioId, \PDO::PARAM_INT);
+        $stmtCount->bindValue(':periodo_id', $periodoId, \PDO::PARAM_INT);
+        $stmtCount->execute();
+        $cuotasRegistradas = (int) ($stmtCount->fetchColumn() ?: 0);
+
+        $saltoMeses = 1;
+        if ($tipoPeriodo === 'trimestral') {
+            $saltoMeses = 3;
+        } elseif ($tipoPeriodo === 'semestral') {
+            $saltoMeses = 6;
+        } elseif ($tipoPeriodo === 'anual') {
+            $saltoMeses = 12;
+        }
+
+        $inicioPeriodo = $base->modify('+' . ($cuotasRegistradas * $saltoMeses) . ' months');
+        $finPeriodo = $inicioPeriodo->modify('+' . ($saltoMeses - 1) . ' months')->modify('last day of this month');
+
+        return $finPeriodo->format('Y-m-d');
     }
 
     public function crear(): void
