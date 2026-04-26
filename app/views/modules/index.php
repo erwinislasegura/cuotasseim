@@ -20,6 +20,7 @@ $statusOptions = [
 ];
 
 $isPaymentHistory = ($route ?? '') === 'pagos';
+$showTableActions = ($route ?? '') !== 'reportes';
 $extraFilters = is_array($extraFilters ?? null) ? $extraFilters : [];
 $extraQueryParams = is_array($extraQueryParams ?? null) ? $extraQueryParams : [];
 $exportQueryParams = array_merge([
@@ -36,6 +37,21 @@ $reportQueryParams = array_merge([
   'to' => (string) ($to ?? ''),
   'report' => 'print',
 ], $extraQueryParams);
+$moduleHighlights = [
+  'reportes' => [
+    'title' => 'Enfoque ejecutivo',
+    'text' => 'Consolida ingresos y egresos para análisis financiero mensual, trimestral y anual.',
+  ],
+  'pagos' => [
+    'title' => 'Control de recaudación',
+    'text' => 'Valida comprobantes, estado de aplicación y consistencia de cobros registrados.',
+  ],
+  'egresos' => [
+    'title' => 'Gestión de salidas',
+    'text' => 'Controla retiros, destinatarios y documentación de respaldo en un solo flujo.',
+  ],
+];
+$currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
 ?>
 
 <section class="page-header d-flex justify-content-between align-items-start mb-3 gap-2 flex-wrap">
@@ -56,6 +72,13 @@ $reportQueryParams = array_merge([
     <a class="btn btn-primary btn-sm" href="<?= htmlspecialchars(url(($route ?? '') . '?' . http_build_query($exportQueryParams))) ?>"><i class="bi bi-download me-1"></i>Excel</a>
   </div>
 </section>
+
+<?php if (is_array($currentHighlight ?? null)): ?>
+  <div class="module-highlight mb-3" role="note" aria-label="Resumen del módulo">
+    <div class="module-highlight-title"><?= htmlspecialchars((string) ($currentHighlight['title'] ?? '')) ?></div>
+    <p class="module-highlight-text mb-0"><?= htmlspecialchars((string) ($currentHighlight['text'] ?? '')) ?></p>
+  </div>
+<?php endif; ?>
 
 <?php if (!empty($moduleSummary)): ?>
   <div class="module-grid-summary mb-3">
@@ -100,11 +123,29 @@ $reportQueryParams = array_merge([
   <div class="card mb-3">
     <div class="card-header py-2"><strong class="card-title mb-0"><?= !empty($currentRecord) ? 'Editar registro' : 'Crear registro' ?></strong></div>
     <div class="card-body py-3">
-      <form class="row g-2" method="post" action="<?= htmlspecialchars(url($route ?? '')) ?>">
+      <form class="row g-2" method="post" action="<?= htmlspecialchars(url($route ?? '')) ?>" <?= ($route ?? '') === 'configuracion' ? 'enctype="multipart/form-data"' : '' ?>>
         <input type="hidden" name="_token" value="<?= htmlspecialchars($token ?? '') ?>">
         <input type="hidden" name="_action" value="save">
         <?php if (!empty($currentRecord)): ?>
           <input type="hidden" name="id" value="<?= (int) ($currentRecord[$primaryKey] ?? 0) ?>">
+        <?php endif; ?>
+
+        <?php if (($route ?? '') === 'configuracion'): ?>
+          <div class="col-12">
+            <label class="form-label">Logo institucional</label>
+            <input type="file" name="logo_file" class="form-control form-control-sm" accept=".png,.jpg,.jpeg,.webp,.svg,image/*">
+            <?php $logoActual = trim((string) ($currentRecord['logo'] ?? '')); ?>
+            <?php if ($logoActual !== ''): ?>
+              <div class="d-flex align-items-center gap-2 mt-2">
+                <img src="<?= htmlspecialchars(url($logoActual)) ?>" alt="Logo actual" style="max-height:42px; width:auto;">
+                <div class="form-check m-0">
+                  <input class="form-check-input" type="checkbox" value="1" id="eliminarLogo" name="eliminar_logo">
+                  <label class="form-check-label small" for="eliminarLogo">Eliminar logo actual</label>
+                </div>
+              </div>
+            <?php endif; ?>
+            <small class="text-muted">Se recomienda PNG transparente o SVG.</small>
+          </div>
         <?php endif; ?>
 
         <?php if (($route ?? '') === 'egresos'): ?>
@@ -548,7 +589,7 @@ $reportQueryParams = array_merge([
 <div class="card">
   <div class="card-header py-2 d-flex justify-content-between align-items-center gap-2 flex-wrap">
     <strong class="card-title mb-0"><?= $isPaymentHistory ? 'Historial de pagos' : 'Listado de registros' ?></strong>
-    <?php if (($route ?? '') === 'rendiciones'): ?>
+    <?php if (($route ?? '') === 'reportes'): ?>
       <div class="d-flex gap-2">
         <a class="btn btn-outline-primary btn-sm" href="<?= htmlspecialchars(url(($route ?? '') . '?' . http_build_query($exportQueryParams))) ?>">
           <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
@@ -580,11 +621,11 @@ $reportQueryParams = array_merge([
         <label class="form-label">Hasta</label>
         <input type="date" name="to" class="form-control form-control-sm" value="<?= htmlspecialchars((string) ($to ?? '')) ?>">
       </div>
-      <?php if (($route ?? '') === 'rendiciones'): ?>
+      <?php if (($route ?? '') === 'reportes'): ?>
         <div class="col-sm-auto">
           <label class="form-label">Periodo</label>
           <select name="periodo" class="form-select form-select-sm">
-            <?php foreach (($formMeta['rendiciones_filter_options']['periodos'] ?? []) as $periodOption): ?>
+            <?php foreach (($formMeta['reportes_filter_options']['periodos'] ?? []) as $periodOption): ?>
               <?php $periodValue = (string) ($periodOption['value'] ?? ''); ?>
               <option value="<?= htmlspecialchars($periodValue) ?>" <?= (string) ($extraFilters['periodo'] ?? '') === $periodValue ? 'selected' : '' ?>>
                 <?= htmlspecialchars((string) ($periodOption['label'] ?? '')) ?>
@@ -596,10 +637,21 @@ $reportQueryParams = array_merge([
           <label class="form-label">Socio</label>
           <select name="socio_id" class="form-select form-select-sm">
             <option value="">Todos</option>
-            <?php foreach (($formMeta['rendiciones_filter_options']['socios'] ?? []) as $socioOption): ?>
+            <?php foreach (($formMeta['reportes_filter_options']['socios'] ?? []) as $socioOption): ?>
               <?php $socioValue = (string) ($socioOption['value'] ?? ''); ?>
               <option value="<?= htmlspecialchars($socioValue) ?>" <?= (string) ($extraFilters['socio_id'] ?? '') === $socioValue ? 'selected' : '' ?>>
                 <?= htmlspecialchars((string) ($socioOption['label'] ?? '')) ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-sm-auto">
+          <label class="form-label">Movimiento</label>
+          <select name="origen_modulo" class="form-select form-select-sm">
+            <?php foreach (($formMeta['reportes_filter_options']['origenes'] ?? []) as $option): ?>
+              <?php $originValue = (string) ($option['value'] ?? ''); ?>
+              <option value="<?= htmlspecialchars($originValue) ?>" <?= (string) ($extraFilters['origen_modulo'] ?? '') === $originValue ? 'selected' : '' ?>>
+                <?= htmlspecialchars((string) ($option['label'] ?? '')) ?>
               </option>
             <?php endforeach; ?>
           </select>
@@ -629,12 +681,14 @@ $reportQueryParams = array_merge([
               <?php $columnLabel = (string) (($columnLabels[$column] ?? ucwords(str_replace('_', ' ', (string) $column)))); ?>
               <th><?= htmlspecialchars($columnLabel) ?></th>
             <?php endforeach; ?>
-            <th class="text-end">Acciones</th>
+            <?php if ($showTableActions): ?>
+              <th class="text-end">Acciones</th>
+            <?php endif; ?>
           </tr>
         </thead>
         <tbody>
           <?php if (empty($rows ?? [])): ?>
-            <tr><td colspan="<?= (int) (count($columns ?? []) + 2) ?>" class="empty-state">Sin registros para mostrar con los filtros aplicados.</td></tr>
+            <tr><td colspan="<?= (int) (count($columns ?? []) + ($showTableActions ? 2 : 1)) ?>" class="empty-state">Sin registros para mostrar con los filtros aplicados.</td></tr>
           <?php else: ?>
             <?php foreach (($rows ?? []) as $index => $row): ?>
               <?php $displayRow = $displayRows[$index] ?? $row; ?>
@@ -658,6 +712,7 @@ $reportQueryParams = array_merge([
                     <?php endif; ?>
                   </td>
                 <?php endforeach; ?>
+                <?php if ($showTableActions): ?>
                 <td class="text-end">
                   <?php
                     $recordDetails = [];
@@ -729,27 +784,30 @@ $reportQueryParams = array_merge([
                             </button>
                           </li>
                         <?php endif; ?>
-                        <li>
-                          <a href="<?= htmlspecialchars(url(($route ?? '') . '?edit=' . (int) ($row[$primaryKey] ?? 0))) ?>" class="dropdown-item <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>">Editar</a>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                          <form method="post" action="<?= htmlspecialchars(url($route ?? '')) ?>" onsubmit="return confirm('¿Deseas eliminar este registro?');">
-                            <input type="hidden" name="_token" value="<?= htmlspecialchars($token ?? '') ?>">
-                            <input type="hidden" name="_action" value="delete">
-                            <input type="hidden" name="id" value="<?= (int) ($row[$primaryKey] ?? 0) ?>">
-                            <button type="submit" class="dropdown-item text-danger" <?= ($isReadOnly ?? false) ? 'disabled' : '' ?>>Eliminar</button>
-                          </form>
-                        </li>
+                        <?php if (!($isReadOnly ?? false)): ?>
+                          <li>
+                            <a href="<?= htmlspecialchars(url(($route ?? '') . '?edit=' . (int) ($row[$primaryKey] ?? 0))) ?>" class="dropdown-item">Editar</a>
+                          </li>
+                          <li><hr class="dropdown-divider"></li>
+                          <li>
+                            <form method="post" action="<?= htmlspecialchars(url($route ?? '')) ?>" onsubmit="return confirm('¿Deseas eliminar este registro?');">
+                              <input type="hidden" name="_token" value="<?= htmlspecialchars($token ?? '') ?>">
+                              <input type="hidden" name="_action" value="delete">
+                              <input type="hidden" name="id" value="<?= (int) ($row[$primaryKey] ?? 0) ?>">
+                              <button type="submit" class="dropdown-item text-danger">Eliminar</button>
+                            </form>
+                          </li>
+                        <?php endif; ?>
                       <?php endif; ?>
                     </ul>
                   </div>
                 </td>
+                <?php endif; ?>
               </tr>
             <?php endforeach; ?>
           <?php endif; ?>
         </tbody>
-        <?php if (($route ?? '') === 'rendiciones'): ?>
+        <?php if (($route ?? '') === 'reportes'): ?>
           <?php
             $totalIngresosTabla = (float) ($moduleSummary['total_ingresos'] ?? 0);
             $totalEgresosTabla = (float) ($moduleSummary['total_egresos'] ?? 0);
@@ -757,7 +815,7 @@ $reportQueryParams = array_merge([
           ?>
           <tfoot>
             <tr class="table-light fw-semibold">
-              <td colspan="5" class="text-end">Totales (según filtros)</td>
+              <td colspan="<?= (int) max(1, count($columns ?? []) - 3) ?>" class="text-end">Totales (según filtros)</td>
               <td class="text-end">$<?= number_format($totalIngresosTabla, 0, ',', '.') ?></td>
               <td class="text-end">$<?= number_format($totalEgresosTabla, 0, ',', '.') ?></td>
               <td class="text-end" style="color:<?= $balanceTabla >= 0 ? '#15803d' : '#b91c1c' ?>">
@@ -774,6 +832,13 @@ $reportQueryParams = array_merge([
     <div class="d-flex align-items-center gap-2">
       <?php $prev = max(1, (int) ($page - 1)); $next = min((int) ($pages ?? 1), (int) ($page + 1));
       $queryBase = '?q=' . urlencode((string) ($query ?? '')) . '&status=' . urlencode((string) ($status ?? '')) . '&from=' . urlencode((string) ($from ?? '')) . '&to=' . urlencode((string) ($to ?? ''));
+      if (($route ?? '') === 'reportes') {
+        $queryBase .= '&periodo=' . urlencode((string) ($extraFilters['periodo'] ?? ''));
+        $queryBase .= '&socio_id=' . urlencode((string) ($extraFilters['socio_id'] ?? ''));
+        $queryBase .= '&origen_modulo=' . urlencode((string) ($extraFilters['origen_modulo'] ?? ''));
+        $queryBase .= '&monto_min=' . urlencode((string) ($extraFilters['monto_min'] ?? ''));
+        $queryBase .= '&monto_max=' . urlencode((string) ($extraFilters['monto_max'] ?? ''));
+      }
       ?>
       <a class="btn btn-outline-secondary btn-sm <?= ($page <= 1) ? 'disabled' : '' ?>" href="<?= htmlspecialchars(url(($route ?? '') . $queryBase . '&page=' . $prev)) ?>">Anterior</a>
       <span>Página <?= (int) ($page ?? 1) ?> / <?= (int) ($pages ?? 1) ?></span>
