@@ -403,15 +403,19 @@ class FlowCheckoutController extends Controller
 
     private function flowRequest(string $path, array $params, array $flowConfig): array
     {
-        $signatureData = array_filter(
-            $params,
-            static fn($value): bool => $value !== null
-        );
+        $signatureData = array_filter($params, static fn($value): bool => $value !== null);
         unset($signatureData['s']);
         ksort($signatureData);
-        $toSign = http_build_query($signatureData, '', '&', PHP_QUERY_RFC3986);
+
+        // Flow firma el string canonical como "k=v&k2=v2" sin URL encode en cada valor.
+        $pairs = [];
+        foreach ($signatureData as $key => $value) {
+            $pairs[] = (string) $key . '=' . (string) $value;
+        }
+        $toSign = implode('&', $pairs);
+
         $params['s'] = hash_hmac('sha256', $toSign, trim((string) ($flowConfig['secret_key'] ?? '')));
-        $postBody = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+        $postBody = http_build_query($params);
 
         $ch = curl_init((string) ($flowConfig['base_url'] . $path));
         curl_setopt_array($ch, [
