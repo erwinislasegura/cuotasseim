@@ -10,6 +10,11 @@ return [
 
     ['GET', '/panel', 'PanelController@index'],
 
+    ['GET', '/pago-flow', 'FlowCheckoutController@index'],
+    ['POST', '/pago-flow/crear', 'FlowCheckoutController@createPayment'],
+    ['GET', '/pago-flow/retorno', 'FlowCheckoutController@retorno'],
+    ['GET', '/pago-flow/rechazado', 'FlowCheckoutController@rejected'],
+
     ['GET', '/socios', 'SociosController@index'],
     ['POST', '/socios', 'SociosController@index'],
     ['GET', '/tipos-socio', 'TiposSocioController@index'],
