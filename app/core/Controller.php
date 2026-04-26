@@ -584,32 +584,46 @@ abstract class Controller
             }
 
             if ($config['table'] === 'configuracion') {
-                $formFields = array_values(array_filter($data['columns']['form'], static fn(string $field): bool => $field !== 'logo'));
+                $formFields = array_values(array_intersect([
+                    'nombre_organizacion',
+                    'rut_organizacion',
+                    'direccion',
+                    'telefono',
+                    'correo',
+                    'flow_api_key',
+                    'flow_secret_key',
+                    'flow_modo_sandbox',
+                ], $data['columns']['form']));
                 $formMeta = [
                     'types' => [
                         'correo' => 'email',
-                        'sitio_web' => 'url',
-                        'texto_comprobante' => 'textarea',
-                        'observaciones_generales' => 'textarea',
-                        'cuota_por_defecto' => 'number',
+                        'flow_modo_sandbox' => 'select',
+                    ],
+                    'options' => [
+                        'flow_modo_sandbox' => [
+                            ['value' => '1', 'label' => 'Sí (Sandbox)'],
+                            ['value' => '0', 'label' => 'No (Producción)'],
+                        ],
                     ],
                     'labels' => [
-                        'nombre_organizacion' => 'Organización',
-                        'nombre_sistema' => 'Nombre del sistema',
-                        'rut_organizacion' => 'RUT',
-                        'direccion' => 'Dirección',
-                        'telefono' => 'Teléfono',
-                        'correo' => 'Correo',
-                        'sitio_web' => 'Sitio web',
-                        'cuota_por_defecto' => 'Cuota por defecto',
-                        'moneda' => 'Moneda',
-                        'simbolo_moneda' => 'Símbolo',
-                        'texto_comprobante' => 'Texto en comprobante',
-                        'observaciones_generales' => 'Observaciones',
-                        'logo' => 'Logo institucional',
+                        'nombre_organizacion' => 'Nombre institución',
+                        'rut_organizacion' => 'RUT institución',
+                        'direccion' => 'Dirección institucional',
+                        'telefono' => 'Teléfono institucional',
+                        'correo' => 'Correo institucional',
+                        'flow_api_key' => 'Flow Api Key',
+                        'flow_secret_key' => 'Flow Secret Key',
+                        'flow_modo_sandbox' => 'Flow Modo Sandbox',
                     ],
-                    'attributes' => [
-                        'cuota_por_defecto' => ['step' => '0.01', 'min' => '0'],
+                    'required' => [
+                        'nombre_organizacion' => true,
+                        'rut_organizacion' => true,
+                        'direccion' => true,
+                        'telefono' => true,
+                        'correo' => true,
+                        'flow_api_key' => true,
+                        'flow_secret_key' => true,
+                        'flow_modo_sandbox' => true,
                     ],
                 ];
                 $columnLabels = $formMeta['labels'];

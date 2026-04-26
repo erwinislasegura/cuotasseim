@@ -78,7 +78,7 @@ class ModuleCatalog
             'all' => $columns,
             'visible' => array_slice($columns, 0, 9),
             'searchable' => array_slice(array_values(array_filter($columns, static fn(string $column) => str_contains($column, 'nombre') || str_contains($column, 'numero') || str_contains($column, 'descripcion') || str_contains($column, 'correo') || str_contains($column, 'rut') || str_contains($column, 'modulo'))), 0, 5),
-            'form' => array_slice($form, 0, 12),
+            'form' => $table === 'configuracion' ? $form : array_slice($form, 0, 12),
             'primary' => $primaryKey,
             'status_field' => $statusField,
             'date_field' => $dateField,
