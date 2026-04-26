@@ -226,6 +226,13 @@ abstract class Controller
                         ['value' => 'trimestre_actual', 'label' => 'Trimestre actual'],
                         ['value' => 'anio_actual', 'label' => 'Año actual'],
                     ],
+                    'origenes' => [
+                        ['value' => '', 'label' => 'Todos los movimientos'],
+                        ['value' => 'pago_cuotas', 'label' => 'Pago de cuotas'],
+                        ['value' => 'aporte', 'label' => 'Aporte'],
+                        ['value' => 'retiro', 'label' => 'Retiro'],
+                        ['value' => 'manual', 'label' => 'Manual / ajuste'],
+                    ],
                     'socios' => array_map(static function (array $item): array {
                         $nombre = trim((string) ($item['nombre_completo'] ?? ''));
                         $rut = trim((string) ($item['rut'] ?? ''));
@@ -1215,7 +1222,17 @@ abstract class Controller
                 'ingreso' AS tipo_movimiento,
                 'Pago de cuotas' AS origen_modulo,
                 p.id AS referencia_id,
-                CONCAT('Pago cuota ', COALESCE(p.numero_comprobante, CONCAT('#', p.id)), ' · ', COALESCE(s.nombre_completo, 'Socio')) AS descripcion,
+                CONCAT(
+                    'Pago cuota ',
+                    COALESCE(p.numero_comprobante, CONCAT('#', p.id)),
+                    ' · ',
+                    COALESCE(s.nombre_completo, 'Socio'),
+                    CASE
+                        WHEN COALESCE(periodos_pago.periodos_cuota, '') <> ''
+                            THEN CONCAT(' · Periodo: ', periodos_pago.periodos_cuota)
+                        ELSE ''
+                    END
+                ) AS descripcion,
                 COALESCE(p.monto_total, 0) AS ingreso,
                 0 AS egreso,
                 COALESCE(mt.saldo_referencial, 0) AS saldo_referencial,
@@ -1226,6 +1243,27 @@ abstract class Controller
             FROM pagos p
             INNER JOIN socios s ON s.id = p.socio_id
             LEFT JOIN usuarios up ON up.id = p.usuario_id
+            LEFT JOIN (
+                SELECT
+                    pd.pago_id,
+                    GROUP_CONCAT(
+                        DISTINCT TRIM(
+                            CONCAT(
+                                COALESCE(pe.nombre_periodo, ''),
+                                CASE
+                                    WHEN pe.anio IS NOT NULL THEN CONCAT(' ', pe.anio)
+                                    ELSE ''
+                                END
+                            )
+                        )
+                        ORDER BY pe.anio DESC, pe.mes DESC
+                        SEPARATOR ', '
+                    ) AS periodos_cuota
+                FROM pago_detalle pd
+                INNER JOIN cuotas c ON c.id = pd.cuota_id
+                LEFT JOIN periodos pe ON pe.id = c.periodo_id
+                GROUP BY pd.pago_id
+            ) periodos_pago ON periodos_pago.pago_id = p.id
             LEFT JOIN movimientos_tesoreria mt ON mt.origen_modulo = 'pagos' AND mt.referencia_id = p.id
             WHERE p.deleted_at IS NULL AND p.estado_pago <> 'anulado' {$dateWherePagos}
 
