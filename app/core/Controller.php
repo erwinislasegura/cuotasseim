@@ -1221,6 +1221,28 @@ abstract class Controller
     {
         try {
             $db = Database::connection();
+            $db->exec("
+                CREATE TABLE IF NOT EXISTS configuracion (
+                    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                    nombre_organizacion VARCHAR(140) NULL,
+                    nombre_sistema VARCHAR(140) NULL,
+                    logo VARCHAR(255) NULL,
+                    rut_organizacion VARCHAR(30) NULL,
+                    direccion VARCHAR(255) NULL,
+                    telefono VARCHAR(40) NULL,
+                    correo VARCHAR(120) NULL,
+                    sitio_web VARCHAR(120) NULL,
+                    flow_api_key VARCHAR(120) NULL,
+                    flow_secret_key VARCHAR(140) NULL,
+                    flow_modo_sandbox TINYINT(1) NOT NULL DEFAULT 1,
+                    cuota_por_defecto DECIMAL(12,2) DEFAULT 0,
+                    moneda VARCHAR(20) DEFAULT 'CLP',
+                    simbolo_moneda VARCHAR(5) DEFAULT '$',
+                    texto_comprobante TEXT NULL,
+                    observaciones_generales TEXT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
 
             $required = [
                 'flow_api_key' => "ALTER TABLE configuracion ADD COLUMN flow_api_key VARCHAR(120) NULL AFTER sitio_web",
