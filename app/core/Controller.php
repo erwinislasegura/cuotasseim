@@ -378,19 +378,28 @@ abstract class Controller
 
                     $isUpdate = $id !== null && $id > 0;
                     $previousRecord = $isUpdate ? ModuleCatalog::findById($config['table'], $primaryKey, $id) : null;
+                    if ($isUpdate && $previousRecord === null) {
+                        $isUpdate = false;
+                        $id = null;
+                    }
+
                     $savedId = ModuleCatalog::save($config['table'], $primaryKey, $columnsMeta['form'], $_POST, $isUpdate ? $id : null);
                     $targetId = $savedId > 0 ? $savedId : ($isUpdate ? (int) $id : 0);
                     $currentRecord = $targetId > 0 ? ModuleCatalog::findById($config['table'], $primaryKey, $targetId) : null;
 
-                    ModuleCatalog::registerAudit(
-                        (string) ($config['route'] ?? $moduleKey),
-                        $isUpdate ? 'actualizar' : 'crear',
-                        $targetId > 0 ? $targetId : null,
-                        is_array($previousRecord) ? $previousRecord : null,
-                        is_array($currentRecord) ? $currentRecord : null
-                    );
+                    if ($savedId > 0) {
+                        ModuleCatalog::registerAudit(
+                            (string) ($config['route'] ?? $moduleKey),
+                            $isUpdate ? 'actualizar' : 'crear',
+                            $targetId > 0 ? $targetId : null,
+                            is_array($previousRecord) ? $previousRecord : null,
+                            is_array($currentRecord) ? $currentRecord : null
+                        );
 
-                    $_SESSION['flash_success'] = $isUpdate ? 'Registro actualizado correctamente.' : 'Registro creado correctamente.';
+                        $_SESSION['flash_success'] = $isUpdate ? 'Registro actualizado correctamente.' : 'Registro creado correctamente.';
+                    } else {
+                        $_SESSION['flash_error'] = 'No se pudo guardar el registro. Verifica que los campos obligatorios tengan datos.';
+                    }
                 }
 
                 if (!$isReadOnly && $action === 'delete' && $id !== null && $id > 0) {
