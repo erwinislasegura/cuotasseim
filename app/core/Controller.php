@@ -324,6 +324,31 @@ abstract class Controller
                 $id = isset($_POST['id']) ? (int) $_POST['id'] : null;
 
                 if (!$isReadOnly && $action === 'save') {
+                    if (($config['route'] ?? '') === 'configuracion') {
+                        $removeLogo = (string) ($_POST['eliminar_logo'] ?? '') === '1';
+                        if ($removeLogo) {
+                            $_POST['logo'] = '';
+                        }
+
+                        if (!empty($_FILES['logo_file']) && (int) ($_FILES['logo_file']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+                            $tmpPath = (string) ($_FILES['logo_file']['tmp_name'] ?? '');
+                            $originalName = (string) ($_FILES['logo_file']['name'] ?? '');
+                            $ext = strtolower((string) pathinfo($originalName, PATHINFO_EXTENSION));
+                            $allowed = ['png', 'jpg', 'jpeg', 'webp', 'svg'];
+                            if ($tmpPath !== '' && in_array($ext, $allowed, true)) {
+                                $uploadDir = dirname(__DIR__, 2) . '/public/uploads/logos';
+                                if (!is_dir($uploadDir)) {
+                                    @mkdir($uploadDir, 0775, true);
+                                }
+                                $filename = 'logo_' . date('Ymd_His') . '_' . bin2hex(random_bytes(3)) . '.' . $ext;
+                                $targetPath = $uploadDir . '/' . $filename;
+                                if (@move_uploaded_file($tmpPath, $targetPath)) {
+                                    $_POST['logo'] = 'public/uploads/logos/' . $filename;
+                                }
+                            }
+                        }
+                    }
+
                     $isUpdate = $id !== null && $id > 0;
                     $previousRecord = $isUpdate ? ModuleCatalog::findById($config['table'], $primaryKey, $id) : null;
                     $savedId = ModuleCatalog::save($config['table'], $primaryKey, $columnsMeta['form'], $_POST, $isUpdate ? $id : null);
@@ -538,6 +563,38 @@ abstract class Controller
                     'monto_a_pagar',
                     'created_at',
                 ], $data['columns']['all']));
+            }
+
+            if ($config['table'] === 'configuracion') {
+                $formFields = array_values(array_filter($data['columns']['form'], static fn(string $field): bool => $field !== 'logo'));
+                $formMeta = [
+                    'types' => [
+                        'correo' => 'email',
+                        'sitio_web' => 'url',
+                        'texto_comprobante' => 'textarea',
+                        'observaciones_generales' => 'textarea',
+                        'cuota_por_defecto' => 'number',
+                    ],
+                    'labels' => [
+                        'nombre_organizacion' => 'Organización',
+                        'nombre_sistema' => 'Nombre del sistema',
+                        'rut_organizacion' => 'RUT',
+                        'direccion' => 'Dirección',
+                        'telefono' => 'Teléfono',
+                        'correo' => 'Correo',
+                        'sitio_web' => 'Sitio web',
+                        'cuota_por_defecto' => 'Cuota por defecto',
+                        'moneda' => 'Moneda',
+                        'simbolo_moneda' => 'Símbolo',
+                        'texto_comprobante' => 'Texto en comprobante',
+                        'observaciones_generales' => 'Observaciones',
+                        'logo' => 'Logo institucional',
+                    ],
+                    'attributes' => [
+                        'cuota_por_defecto' => ['step' => '0.01', 'min' => '0'],
+                    ],
+                ];
+                $columnLabels = $formMeta['labels'];
             }
 
             if ($config['table'] === 'socios') {

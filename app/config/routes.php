@@ -16,8 +16,6 @@ return [
     ['POST', '/tipos-socio', 'TiposSocioController@index'],
     ['GET', '/periodos', 'PeriodosController@index'],
     ['POST', '/periodos', 'PeriodosController@index'],
-    ['GET', '/conceptos-cobro', 'ConceptosCobroController@index'],
-    ['POST', '/conceptos-cobro', 'ConceptosCobroController@index'],
 
     ['GET', '/cuotas', 'CuotasController@index'],
     ['POST', '/cuotas', 'CuotasController@index'],

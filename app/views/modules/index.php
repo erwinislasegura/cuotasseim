@@ -122,11 +122,29 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
   <div class="card mb-3">
     <div class="card-header py-2"><strong class="card-title mb-0"><?= !empty($currentRecord) ? 'Editar registro' : 'Crear registro' ?></strong></div>
     <div class="card-body py-3">
-      <form class="row g-2" method="post" action="<?= htmlspecialchars(url($route ?? '')) ?>">
+      <form class="row g-2" method="post" action="<?= htmlspecialchars(url($route ?? '')) ?>" <?= ($route ?? '') === 'configuracion' ? 'enctype="multipart/form-data"' : '' ?>>
         <input type="hidden" name="_token" value="<?= htmlspecialchars($token ?? '') ?>">
         <input type="hidden" name="_action" value="save">
         <?php if (!empty($currentRecord)): ?>
           <input type="hidden" name="id" value="<?= (int) ($currentRecord[$primaryKey] ?? 0) ?>">
+        <?php endif; ?>
+
+        <?php if (($route ?? '') === 'configuracion'): ?>
+          <div class="col-12">
+            <label class="form-label">Logo institucional</label>
+            <input type="file" name="logo_file" class="form-control form-control-sm" accept=".png,.jpg,.jpeg,.webp,.svg,image/*">
+            <?php $logoActual = trim((string) ($currentRecord['logo'] ?? '')); ?>
+            <?php if ($logoActual !== ''): ?>
+              <div class="d-flex align-items-center gap-2 mt-2">
+                <img src="<?= htmlspecialchars(url($logoActual)) ?>" alt="Logo actual" style="max-height:42px; width:auto;">
+                <div class="form-check m-0">
+                  <input class="form-check-input" type="checkbox" value="1" id="eliminarLogo" name="eliminar_logo">
+                  <label class="form-check-label small" for="eliminarLogo">Eliminar logo actual</label>
+                </div>
+              </div>
+            <?php endif; ?>
+            <small class="text-muted">Se recomienda PNG transparente o SVG.</small>
+          </div>
         <?php endif; ?>
 
         <?php if (($route ?? '') === 'egresos'): ?>

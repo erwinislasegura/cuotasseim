@@ -1,4 +1,6 @@
 <?php
+use App\Core\Database;
+
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $scriptDir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/');
 
@@ -39,13 +41,28 @@ $menu = [
         ['route' => 'medios-pago', 'label' => 'Medios de pago', 'icon' => 'bi-wallet2'],
         ['route' => 'tipos-aporte', 'label' => 'Tipos de aporte', 'icon' => 'bi-coin'],
         ['route' => 'tipos-egreso', 'label' => 'Tipos de egreso', 'icon' => 'bi-tags'],
-        ['route' => 'conceptos-cobro', 'label' => 'Conceptos de cobro', 'icon' => 'bi-card-list'],
     ],
 ];
+
+$logoPath = '';
+try {
+    if (Database::connection() !== null) {
+        $stmtLogo = Database::connection()->query('SELECT logo FROM configuracion ORDER BY id DESC LIMIT 1');
+        $logoPath = trim((string) ($stmtLogo->fetchColumn() ?: ''));
+    }
+} catch (\Throwable $exception) {
+    $logoPath = '';
+}
 ?>
 
 <div class="sidebar-brand">
-  <div class="sidebar-logo"><i class="bi bi-grid-1x2-fill"></i></div>
+  <div class="sidebar-logo">
+    <?php if ($logoPath !== ''): ?>
+      <img src="<?= htmlspecialchars(url($logoPath)) ?>" alt="Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+    <?php else: ?>
+      <i class="bi bi-grid-1x2-fill"></i>
+    <?php endif; ?>
+  </div>
   <div>
     <h6 class="mb-0 text-white">Gestión de Cuotas</h6>
     <small class="text-white-50">Administración integral</small>

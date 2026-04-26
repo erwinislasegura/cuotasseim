@@ -1,4 +1,6 @@
 <?php
+use App\Core\Database;
+
 $summary = is_array($summary ?? null) ? $summary : [];
 $byType = is_array($byType ?? null) ? $byType : [];
 $byOrigin = is_array($byOrigin ?? null) ? $byOrigin : [];
@@ -17,6 +19,13 @@ foreach ($byOrigin as $origin => $values) {
 }
 $maxOriginValues = array_values(array_map(static fn($value): float => (float) $value, $originTotals ?: [0]));
 $sumOrigin = max(1.0, array_sum($maxOriginValues));
+$logoPath = '';
+try {
+    $stmtLogo = Database::connection()->query('SELECT logo FROM configuracion ORDER BY id DESC LIMIT 1');
+    $logoPath = trim((string) ($stmtLogo->fetchColumn() ?: ''));
+} catch (\Throwable $exception) {
+    $logoPath = '';
+}
 ?>
 
 <style>
@@ -65,6 +74,9 @@ $sumOrigin = max(1.0, array_sum($maxOriginValues));
 <div class="report-wrap">
   <div class="report-header">
     <div>
+      <?php if ($logoPath !== ''): ?>
+        <div class="mb-2"><img src="<?= htmlspecialchars(url($logoPath)) ?>" alt="Logo organización" style="max-height:52px; width:auto;"></div>
+      <?php endif; ?>
       <div class="report-subtitle">Gerencia administrativa · formato de impresión</div>
       <h2 class="report-title">Informe corporativo de reportes</h2>
       <div class="report-meta">
