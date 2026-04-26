@@ -45,7 +45,7 @@ abstract class Controller
         $extraConditions = [];
         $extraQueryParams = [];
 
-        if (($config['route'] ?? '') === 'rendiciones') {
+        if (($config['route'] ?? '') === 'reportes') {
             $periodPreset = trim((string) ($_GET['periodo'] ?? ''));
             $socioId = (int) ($_GET['socio_id'] ?? 0);
             $montoMin = trim((string) ($_GET['monto_min'] ?? ''));
@@ -142,8 +142,8 @@ abstract class Controller
 
             if (($_GET['export'] ?? '') === 'excel') {
                 ModuleCatalog::exportCsv(
-                    'rendiciones_' . date('Ymd_His') . '.csv',
-                    ['fecha', 'tipo_movimiento', 'origen_modulo', 'descripcion', 'ingreso', 'egreso'],
+                    'reportes_' . date('Ymd_His') . '.csv',
+                    ['fecha', 'tipo_movimiento', 'origen_modulo', 'descripcion', 'ingreso', 'egreso', 'saldo_referencial', 'usuario_registro'],
                     $rendicionesResult['filtered_rows']
                 );
                 return;
@@ -193,8 +193,8 @@ abstract class Controller
                 ksort($byMonth);
                 ksort($byOrigin);
 
-                $this->view('rendiciones/report', [
-                    'title' => 'Informe de rendiciones',
+                $this->view('reportes/report', [
+                    'title' => 'Informe de reportes',
                     'rows' => $reportRows,
                     'query' => $query,
                     'status' => $status,
@@ -212,7 +212,7 @@ abstract class Controller
             $sociosStmt = Database::connection()->query('SELECT id, nombre_completo, rut, numero_socio FROM socios WHERE deleted_at IS NULL ORDER BY nombre_completo ASC');
             $socios = $sociosStmt->fetchAll();
             $formMeta = [
-                'rendiciones_filter_options' => [
+                'reportes_filter_options' => [
                     'periodos' => [
                         ['value' => '', 'label' => 'Manual (Desde/Hasta)'],
                         ['value' => 'mes_actual', 'label' => 'Mes actual'],
@@ -251,9 +251,10 @@ abstract class Controller
                 'displayRows' => array_map(static function (array $row): array {
                     $row['ingreso'] = '$' . number_format((float) ($row['ingreso'] ?? 0), 0, ',', '.');
                     $row['egreso'] = '$' . number_format((float) ($row['egreso'] ?? 0), 0, ',', '.');
+                    $row['saldo_referencial'] = '$' . number_format((float) ($row['saldo_referencial'] ?? 0), 0, ',', '.');
                     return $row;
                 }, $rendicionesResult['rows']),
-                'columns' => ['fecha', 'tipo_movimiento', 'origen_modulo', 'descripcion', 'ingreso', 'egreso'],
+                'columns' => ['fecha', 'tipo_movimiento', 'origen_modulo', 'referencia_id', 'descripcion', 'ingreso', 'egreso', 'saldo_referencial', 'usuario_registro'],
                 'formFields' => [],
                 'statusField' => 'tipo_movimiento',
                 'statusCounts' => $rendicionesResult['status_counts'],
@@ -281,9 +282,12 @@ abstract class Controller
                     'fecha' => 'Fecha',
                     'tipo_movimiento' => 'Tipo',
                     'origen_modulo' => 'Origen',
+                    'referencia_id' => 'Referencia',
                     'descripcion' => 'Descripción',
                     'ingreso' => 'Ingreso',
                     'egreso' => 'Egreso',
+                    'saldo_referencial' => 'Saldo referencial',
+                    'usuario_registro' => 'Registrado por',
                 ],
                 'extraFilters' => $extraFilters,
                 'extraQueryParams' => $extraQueryParams,
@@ -316,12 +320,33 @@ abstract class Controller
                 $id = isset($_POST['id']) ? (int) $_POST['id'] : null;
 
                 if (!$isReadOnly && $action === 'save') {
-                    ModuleCatalog::save($config['table'], $primaryKey, $columnsMeta['form'], $_POST, $id > 0 ? $id : null);
-                    $_SESSION['flash_success'] = $id ? 'Registro actualizado correctamente.' : 'Registro creado correctamente.';
+                    $isUpdate = $id !== null && $id > 0;
+                    $previousRecord = $isUpdate ? ModuleCatalog::findById($config['table'], $primaryKey, $id) : null;
+                    $savedId = ModuleCatalog::save($config['table'], $primaryKey, $columnsMeta['form'], $_POST, $isUpdate ? $id : null);
+                    $targetId = $savedId > 0 ? $savedId : ($isUpdate ? (int) $id : 0);
+                    $currentRecord = $targetId > 0 ? ModuleCatalog::findById($config['table'], $primaryKey, $targetId) : null;
+
+                    ModuleCatalog::registerAudit(
+                        (string) ($config['route'] ?? $moduleKey),
+                        $isUpdate ? 'actualizar' : 'crear',
+                        $targetId > 0 ? $targetId : null,
+                        is_array($previousRecord) ? $previousRecord : null,
+                        is_array($currentRecord) ? $currentRecord : null
+                    );
+
+                    $_SESSION['flash_success'] = $isUpdate ? 'Registro actualizado correctamente.' : 'Registro creado correctamente.';
                 }
 
                 if (!$isReadOnly && $action === 'delete' && $id !== null && $id > 0) {
+                    $deletedRecord = ModuleCatalog::findById($config['table'], $primaryKey, $id);
                     ModuleCatalog::delete($config['table'], $primaryKey, $id, $columnsMeta['has_deleted_at']);
+                    ModuleCatalog::registerAudit(
+                        (string) ($config['route'] ?? $moduleKey),
+                        'eliminar',
+                        $id,
+                        is_array($deletedRecord) ? $deletedRecord : null,
+                        null
+                    );
                     $_SESSION['flash_success'] = 'Registro eliminado correctamente.';
                 }
 
@@ -333,7 +358,7 @@ abstract class Controller
                 return;
             }
 
-            if (($config['route'] ?? '') === 'rendiciones' && (string) ($_GET['report'] ?? '') === 'print') {
+            if (($config['route'] ?? '') === 'reportes' && (string) ($_GET['report'] ?? '') === 'print') {
                 $fullPerPage = max(1, min(5000, (int) ($data['total'] ?? 0)));
                 $fullData = ModuleCatalog::fetchData(
                     $config,
@@ -389,8 +414,8 @@ abstract class Controller
                 ksort($byMonth);
                 ksort($byOrigin);
 
-                $this->view('rendiciones/report', [
-                    'title' => 'Informe de rendiciones',
+                $this->view('reportes/report', [
+                    'title' => 'Informe de reportes',
                     'rows' => $reportRows,
                     'query' => $query,
                     'status' => $status,
@@ -415,6 +440,55 @@ abstract class Controller
             $columnLabels = [];
             $visibleColumns = $data['columns']['visible'];
             $displayRows = ModuleCatalog::decorateRowsForDisplay($config['table'], $data['rows']);
+
+            if (($config['route'] ?? '') === 'auditoria') {
+                $usuariosMap = [];
+                foreach ($displayRows as $auditRow) {
+                    $uid = (int) ($auditRow['usuario_id'] ?? 0);
+                    if ($uid > 0) {
+                        $usuariosMap[$uid] = $uid;
+                    }
+                }
+
+                if (!empty($usuariosMap) && ModuleCatalog::tableExists('usuarios')) {
+                    $ids = array_keys($usuariosMap);
+                    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                    $stmtUsuarios = Database::connection()->prepare('SELECT id, nombre, usuario, correo FROM usuarios WHERE id IN (' . $placeholders . ')');
+                    foreach ($ids as $index => $userId) {
+                        $stmtUsuarios->bindValue($index + 1, $userId, \PDO::PARAM_INT);
+                    }
+                    $stmtUsuarios->execute();
+
+                    foreach ($stmtUsuarios->fetchAll() as $userRow) {
+                        $userId = (int) ($userRow['id'] ?? 0);
+                        if ($userId <= 0) {
+                            continue;
+                        }
+                        $nombre = trim((string) ($userRow['nombre'] ?? ''));
+                        $usuario = trim((string) ($userRow['usuario'] ?? ''));
+                        $correo = trim((string) ($userRow['correo'] ?? ''));
+                        $label = $nombre !== '' ? $nombre : ($usuario !== '' ? $usuario : ('Usuario #' . $userId));
+                        if ($usuario !== '' && $usuario !== $label) {
+                            $label .= ' · @' . $usuario;
+                        }
+                        if ($correo !== '') {
+                            $label .= ' · ' . $correo;
+                        }
+                        $usuariosMap[$userId] = $label;
+                    }
+                }
+
+                $displayRows = array_map(static function (array $auditRow) use ($usuariosMap): array {
+                    $uid = (int) ($auditRow['usuario_id'] ?? 0);
+                    if ($uid > 0) {
+                        $auditRow['usuario_id'] = (string) ($usuariosMap[$uid] ?? ('Usuario #' . $uid));
+                    } else {
+                        $auditRow['usuario_id'] = 'Sistema';
+                    }
+
+                    return $auditRow;
+                }, $displayRows);
+            }
 
             if ($editId !== null && $editId > 0) {
                 $currentRecord = ModuleCatalog::findById($config['table'], $primaryKey, $editId);
@@ -733,7 +807,31 @@ abstract class Controller
                 ], $data['columns']['all']));
             }
 
-            if (($config['route'] ?? '') === 'rendiciones') {
+            if (($config['route'] ?? '') === 'auditoria') {
+                $columnLabels = [
+                    'usuario_id' => 'Usuario',
+                    'modulo' => 'Módulo',
+                    'accion' => 'Acción',
+                    'id_registro' => 'ID registro',
+                    'datos_anteriores' => 'Datos anteriores',
+                    'datos_nuevos' => 'Datos nuevos',
+                    'fecha' => 'Fecha',
+                    'ip' => 'IP',
+                    'user_agent' => 'Navegador',
+                ];
+                $visibleColumns = array_values(array_intersect([
+                    'fecha',
+                    'usuario_id',
+                    'modulo',
+                    'accion',
+                    'id_registro',
+                    'ip',
+                    'user_agent',
+                ], $data['columns']['all']));
+                $formFields = [];
+            }
+
+            if (($config['route'] ?? '') === 'reportes') {
                 $sociosStmt = Database::connection()->query('SELECT id, nombre_completo, rut, numero_socio FROM socios WHERE deleted_at IS NULL ORDER BY nombre_completo ASC');
                 $socios = $sociosStmt->fetchAll();
 
@@ -741,22 +839,26 @@ abstract class Controller
                     'fecha' => 'Fecha',
                     'tipo_movimiento' => 'Tipo',
                     'origen_modulo' => 'Origen',
+                    'referencia_id' => 'Referencia',
                     'descripcion' => 'Descripción',
                     'ingreso' => 'Ingreso',
                     'egreso' => 'Egreso',
                     'saldo_referencial' => 'Saldo referencial',
+                    'usuario_registro' => 'Registrado por',
                 ];
                 $visibleColumns = array_values(array_intersect([
                     'fecha',
                     'tipo_movimiento',
                     'origen_modulo',
+                    'referencia_id',
                     'descripcion',
                     'ingreso',
                     'egreso',
                     'saldo_referencial',
+                    'usuario_registro',
                 ], $data['columns']['all']));
                 $formFields = [];
-                $formMeta['rendiciones_filter_options'] = [
+                $formMeta['reportes_filter_options'] = [
                     'periodos' => [
                         ['value' => '', 'label' => 'Manual (Desde/Hasta)'],
                         ['value' => 'mes_actual', 'label' => 'Mes actual'],
@@ -998,47 +1100,123 @@ abstract class Controller
         $dateWherePagos = '';
         $dateWhereAportes = '';
         $dateWhereEgresos = '';
+        $dateWhereTesoreria = '';
+
         if ($from !== '') {
             $dateWherePagos .= ' AND DATE(p.fecha_pago) >= :from_date_pagos';
             $dateWhereAportes .= ' AND DATE(a.fecha_aporte) >= :from_date_aportes';
             $dateWhereEgresos .= ' AND DATE(e.fecha) >= :from_date_egresos';
+            $dateWhereTesoreria .= ' AND DATE(mt.fecha) >= :from_date_mt';
             $params[':from_date_pagos'] = $from;
             $params[':from_date_aportes'] = $from;
             $params[':from_date_egresos'] = $from;
+            $params[':from_date_mt'] = $from;
         }
         if ($to !== '') {
             $dateWherePagos .= ' AND DATE(p.fecha_pago) <= :to_date_pagos';
             $dateWhereAportes .= ' AND DATE(a.fecha_aporte) <= :to_date_aportes';
             $dateWhereEgresos .= ' AND DATE(e.fecha) <= :to_date_egresos';
+            $dateWhereTesoreria .= ' AND DATE(mt.fecha) <= :to_date_mt';
             $params[':to_date_pagos'] = $to;
             $params[':to_date_aportes'] = $to;
             $params[':to_date_egresos'] = $to;
+            $params[':to_date_mt'] = $to;
         }
 
         $sql = "
-            SELECT CONCAT('P-', p.id) AS row_id, p.fecha_pago AS fecha, 'ingreso' AS tipo_movimiento, 'Pago de cuota' AS origen_modulo,
-                   CONCAT('Pago cuota ', COALESCE(p.numero_comprobante, CONCAT('#', p.id)), ' · ', COALESCE(s.nombre_completo, 'Socio')) AS descripcion,
-                   p.monto_total AS ingreso, 0 AS egreso, s.id AS socio_id, COALESCE(s.rut, '') AS socio_rut, COALESCE(s.nombre_completo, '') AS socio_nombre
+            SELECT
+                CONCAT('P-', p.id) AS row_id,
+                p.id,
+                p.fecha_pago AS fecha,
+                'ingreso' AS tipo_movimiento,
+                'pagos' AS origen_modulo,
+                p.id AS referencia_id,
+                CONCAT('Pago cuota ', COALESCE(p.numero_comprobante, CONCAT('#', p.id)), ' · ', COALESCE(s.nombre_completo, 'Socio')) AS descripcion,
+                COALESCE(p.monto_total, 0) AS ingreso,
+                0 AS egreso,
+                COALESCE(mt.saldo_referencial, 0) AS saldo_referencial,
+                COALESCE(s.id, 0) AS socio_id,
+                COALESCE(s.rut, '') AS socio_rut,
+                COALESCE(s.nombre_completo, '') AS socio_nombre,
+                COALESCE(up.nombre, up.usuario, CONCAT('Usuario #', COALESCE(up.id, 0)), 'Sistema') AS usuario_registro
             FROM pagos p
             INNER JOIN socios s ON s.id = p.socio_id
-            WHERE (p.deleted_at IS NULL) AND p.estado_pago <> 'anulado' {$dateWherePagos}
+            LEFT JOIN usuarios up ON up.id = p.usuario_id
+            LEFT JOIN movimientos_tesoreria mt ON mt.origen_modulo = 'pagos' AND mt.referencia_id = p.id
+            WHERE p.deleted_at IS NULL AND p.estado_pago <> 'anulado' {$dateWherePagos}
 
             UNION ALL
 
-            SELECT CONCAT('A-', a.id) AS row_id, a.fecha_aporte AS fecha, 'ingreso' AS tipo_movimiento, 'Aporte' AS origen_modulo,
-                   CONCAT('Aporte ', COALESCE(a.comentario, a.descripcion, ''), ' · ', COALESCE(s.nombre_completo, a.nombre_aportante, 'Aportante')) AS descripcion,
-                   a.monto AS ingreso, 0 AS egreso, COALESCE(s.id, 0) AS socio_id, COALESCE(s.rut, '') AS socio_rut, COALESCE(s.nombre_completo, a.nombre_aportante, '') AS socio_nombre
+            SELECT
+                CONCAT('A-', a.id) AS row_id,
+                a.id,
+                a.fecha_aporte AS fecha,
+                'ingreso' AS tipo_movimiento,
+                'aportes' AS origen_modulo,
+                a.id AS referencia_id,
+                CONCAT('Aporte ', COALESCE(a.comentario, a.descripcion, ''), ' · ', COALESCE(s.nombre_completo, a.nombre_aportante, 'Aportante')) AS descripcion,
+                COALESCE(a.monto, 0) AS ingreso,
+                0 AS egreso,
+                COALESCE(mt.saldo_referencial, 0) AS saldo_referencial,
+                COALESCE(s.id, 0) AS socio_id,
+                COALESCE(s.rut, '') AS socio_rut,
+                COALESCE(s.nombre_completo, a.nombre_aportante, '') AS socio_nombre,
+                COALESCE(ua.nombre, ua.usuario, CONCAT('Usuario #', COALESCE(ua.id, 0)), 'Sistema') AS usuario_registro
             FROM aportes a
             LEFT JOIN socios s ON s.id = a.socio_id
+            LEFT JOIN usuarios ua ON ua.id = a.usuario_id
+            LEFT JOIN movimientos_tesoreria mt ON mt.origen_modulo = 'aportes' AND mt.referencia_id = a.id
             WHERE a.estado <> 'anulado' {$dateWhereAportes}
 
             UNION ALL
 
-            SELECT CONCAT('E-', e.id) AS row_id, e.fecha AS fecha, 'egreso' AS tipo_movimiento, 'Retiro' AS origen_modulo,
-                   CONCAT('Retiro ', COALESCE(e.numero_documento, CONCAT('#', e.id)), ' · ', COALESCE(e.proveedor_destinatario, ''), ' · ', COALESCE(e.descripcion, '')) AS descripcion,
-                   0 AS ingreso, e.monto AS egreso, 0 AS socio_id, '' AS socio_rut, COALESCE(e.proveedor_destinatario, '') AS socio_nombre
+            SELECT
+                CONCAT('E-', e.id) AS row_id,
+                e.id,
+                e.fecha AS fecha,
+                'egreso' AS tipo_movimiento,
+                'egresos' AS origen_modulo,
+                e.id AS referencia_id,
+                CONCAT('Retiro ', COALESCE(e.numero_documento, CONCAT('#', e.id)), ' · ', COALESCE(e.proveedor_destinatario, ''), ' · ', COALESCE(e.descripcion, '')) AS descripcion,
+                0 AS ingreso,
+                COALESCE(e.monto, 0) AS egreso,
+                COALESCE(mt.saldo_referencial, 0) AS saldo_referencial,
+                0 AS socio_id,
+                '' AS socio_rut,
+                COALESCE(e.proveedor_destinatario, '') AS socio_nombre,
+                COALESCE(ue.nombre, ue.usuario, CONCAT('Usuario #', COALESCE(ue.id, 0)), 'Sistema') AS usuario_registro
             FROM egresos e
-            WHERE (e.deleted_at IS NULL) AND e.estado <> 'anulado' {$dateWhereEgresos}
+            LEFT JOIN usuarios ue ON ue.id = e.usuario_id
+            LEFT JOIN movimientos_tesoreria mt ON mt.origen_modulo = 'egresos' AND mt.referencia_id = e.id
+            WHERE e.deleted_at IS NULL AND e.estado <> 'anulado' {$dateWhereEgresos}
+
+            UNION ALL
+
+            SELECT
+                CONCAT('MT-', mt.id) AS row_id,
+                mt.id,
+                mt.fecha,
+                mt.tipo_movimiento,
+                mt.origen_modulo,
+                mt.referencia_id,
+                COALESCE(mt.descripcion, '') AS descripcion,
+                COALESCE(mt.ingreso, 0) AS ingreso,
+                COALESCE(mt.egreso, 0) AS egreso,
+                COALESCE(mt.saldo_referencial, 0) AS saldo_referencial,
+                0 AS socio_id,
+                '' AS socio_rut,
+                '' AS socio_nombre,
+                'Sistema / Ajuste manual' AS usuario_registro
+            FROM movimientos_tesoreria mt
+            LEFT JOIN pagos p ON mt.origen_modulo = 'pagos' AND mt.referencia_id = p.id
+            LEFT JOIN aportes a ON mt.origen_modulo = 'aportes' AND mt.referencia_id = a.id
+            LEFT JOIN egresos e ON mt.origen_modulo = 'egresos' AND mt.referencia_id = e.id
+            WHERE (
+                mt.origen_modulo NOT IN ('pagos', 'aportes', 'egresos')
+                OR (mt.origen_modulo = 'pagos' AND p.id IS NULL)
+                OR (mt.origen_modulo = 'aportes' AND a.id IS NULL)
+                OR (mt.origen_modulo = 'egresos' AND e.id IS NULL)
+            ) {$dateWhereTesoreria}
         ";
 
         $stmt = $db->prepare($sql);
@@ -1088,7 +1266,7 @@ abstract class Controller
             }
 
             if ($queryLower !== '') {
-                $haystack = mb_strtolower(trim((string) (($row['descripcion'] ?? '') . ' ' . ($row['origen_modulo'] ?? '') . ' ' . ($row['socio_nombre'] ?? '') . ' ' . ($row['socio_rut'] ?? ''))));
+                $haystack = mb_strtolower(trim((string) (($row['descripcion'] ?? '') . ' ' . ($row['origen_modulo'] ?? '') . ' ' . ($row['socio_nombre'] ?? '') . ' ' . ($row['socio_rut'] ?? '') . ' ' . ($row['usuario_registro'] ?? ''))));
                 if (!str_contains($haystack, $queryLower)) {
                     return false;
                 }
