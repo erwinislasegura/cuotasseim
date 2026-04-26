@@ -143,7 +143,7 @@ abstract class Controller
             if (($_GET['export'] ?? '') === 'excel') {
                 ModuleCatalog::exportCsv(
                     'reportes_' . date('Ymd_His') . '.csv',
-                    ['fecha', 'tipo_movimiento', 'origen_modulo', 'descripcion', 'ingreso', 'egreso'],
+                    ['fecha', 'tipo_movimiento', 'origen_modulo', 'descripcion', 'ingreso', 'egreso', 'saldo_referencial', 'usuario_registro'],
                     $rendicionesResult['filtered_rows']
                 );
                 return;
@@ -251,9 +251,10 @@ abstract class Controller
                 'displayRows' => array_map(static function (array $row): array {
                     $row['ingreso'] = '$' . number_format((float) ($row['ingreso'] ?? 0), 0, ',', '.');
                     $row['egreso'] = '$' . number_format((float) ($row['egreso'] ?? 0), 0, ',', '.');
+                    $row['saldo_referencial'] = '$' . number_format((float) ($row['saldo_referencial'] ?? 0), 0, ',', '.');
                     return $row;
                 }, $rendicionesResult['rows']),
-                'columns' => ['fecha', 'tipo_movimiento', 'origen_modulo', 'descripcion', 'ingreso', 'egreso'],
+                'columns' => ['fecha', 'tipo_movimiento', 'origen_modulo', 'referencia_id', 'descripcion', 'ingreso', 'egreso', 'saldo_referencial', 'usuario_registro'],
                 'formFields' => [],
                 'statusField' => 'tipo_movimiento',
                 'statusCounts' => $rendicionesResult['status_counts'],
@@ -281,9 +282,12 @@ abstract class Controller
                     'fecha' => 'Fecha',
                     'tipo_movimiento' => 'Tipo',
                     'origen_modulo' => 'Origen',
+                    'referencia_id' => 'Referencia',
                     'descripcion' => 'Descripción',
                     'ingreso' => 'Ingreso',
                     'egreso' => 'Egreso',
+                    'saldo_referencial' => 'Saldo referencial',
+                    'usuario_registro' => 'Registrado por',
                 ],
                 'extraFilters' => $extraFilters,
                 'extraQueryParams' => $extraQueryParams,
@@ -835,19 +839,23 @@ abstract class Controller
                     'fecha' => 'Fecha',
                     'tipo_movimiento' => 'Tipo',
                     'origen_modulo' => 'Origen',
+                    'referencia_id' => 'Referencia',
                     'descripcion' => 'Descripción',
                     'ingreso' => 'Ingreso',
                     'egreso' => 'Egreso',
                     'saldo_referencial' => 'Saldo referencial',
+                    'usuario_registro' => 'Registrado por',
                 ];
                 $visibleColumns = array_values(array_intersect([
                     'fecha',
                     'tipo_movimiento',
                     'origen_modulo',
+                    'referencia_id',
                     'descripcion',
                     'ingreso',
                     'egreso',
                     'saldo_referencial',
+                    'usuario_registro',
                 ], $data['columns']['all']));
                 $formFields = [];
                 $formMeta['reportes_filter_options'] = [
@@ -1089,50 +1097,52 @@ abstract class Controller
         $perPage = 10;
 
         $params = [];
-        $dateWherePagos = '';
-        $dateWhereAportes = '';
-        $dateWhereEgresos = '';
+        $whereSql = 'WHERE 1=1';
+
         if ($from !== '') {
-            $dateWherePagos .= ' AND DATE(p.fecha_pago) >= :from_date_pagos';
-            $dateWhereAportes .= ' AND DATE(a.fecha_aporte) >= :from_date_aportes';
-            $dateWhereEgresos .= ' AND DATE(e.fecha) >= :from_date_egresos';
-            $params[':from_date_pagos'] = $from;
-            $params[':from_date_aportes'] = $from;
-            $params[':from_date_egresos'] = $from;
+            $whereSql .= ' AND DATE(mt.fecha) >= :from_date';
+            $params[':from_date'] = $from;
         }
         if ($to !== '') {
-            $dateWherePagos .= ' AND DATE(p.fecha_pago) <= :to_date_pagos';
-            $dateWhereAportes .= ' AND DATE(a.fecha_aporte) <= :to_date_aportes';
-            $dateWhereEgresos .= ' AND DATE(e.fecha) <= :to_date_egresos';
-            $params[':to_date_pagos'] = $to;
-            $params[':to_date_aportes'] = $to;
-            $params[':to_date_egresos'] = $to;
+            $whereSql .= ' AND DATE(mt.fecha) <= :to_date';
+            $params[':to_date'] = $to;
         }
 
         $sql = "
-            SELECT CONCAT('P-', p.id) AS row_id, p.fecha_pago AS fecha, 'ingreso' AS tipo_movimiento, 'Pago de cuota' AS origen_modulo,
-                   CONCAT('Pago cuota ', COALESCE(p.numero_comprobante, CONCAT('#', p.id)), ' · ', COALESCE(s.nombre_completo, 'Socio')) AS descripcion,
-                   p.monto_total AS ingreso, 0 AS egreso, s.id AS socio_id, COALESCE(s.rut, '') AS socio_rut, COALESCE(s.nombre_completo, '') AS socio_nombre
-            FROM pagos p
-            INNER JOIN socios s ON s.id = p.socio_id
-            WHERE (p.deleted_at IS NULL) AND p.estado_pago <> 'anulado' {$dateWherePagos}
-
-            UNION ALL
-
-            SELECT CONCAT('A-', a.id) AS row_id, a.fecha_aporte AS fecha, 'ingreso' AS tipo_movimiento, 'Aporte' AS origen_modulo,
-                   CONCAT('Aporte ', COALESCE(a.comentario, a.descripcion, ''), ' · ', COALESCE(s.nombre_completo, a.nombre_aportante, 'Aportante')) AS descripcion,
-                   a.monto AS ingreso, 0 AS egreso, COALESCE(s.id, 0) AS socio_id, COALESCE(s.rut, '') AS socio_rut, COALESCE(s.nombre_completo, a.nombre_aportante, '') AS socio_nombre
-            FROM aportes a
-            LEFT JOIN socios s ON s.id = a.socio_id
-            WHERE a.estado <> 'anulado' {$dateWhereAportes}
-
-            UNION ALL
-
-            SELECT CONCAT('E-', e.id) AS row_id, e.fecha AS fecha, 'egreso' AS tipo_movimiento, 'Retiro' AS origen_modulo,
-                   CONCAT('Retiro ', COALESCE(e.numero_documento, CONCAT('#', e.id)), ' · ', COALESCE(e.proveedor_destinatario, ''), ' · ', COALESCE(e.descripcion, '')) AS descripcion,
-                   0 AS ingreso, e.monto AS egreso, 0 AS socio_id, '' AS socio_rut, COALESCE(e.proveedor_destinatario, '') AS socio_nombre
-            FROM egresos e
-            WHERE (e.deleted_at IS NULL) AND e.estado <> 'anulado' {$dateWhereEgresos}
+            SELECT
+                CONCAT('MT-', mt.id) AS row_id,
+                mt.id,
+                mt.fecha,
+                mt.tipo_movimiento,
+                mt.origen_modulo,
+                mt.referencia_id,
+                COALESCE(mt.descripcion, '') AS descripcion,
+                COALESCE(mt.ingreso, 0) AS ingreso,
+                COALESCE(mt.egreso, 0) AS egreso,
+                COALESCE(mt.saldo_referencial, 0) AS saldo_referencial,
+                COALESCE(s.id, 0) AS socio_id,
+                COALESCE(s.rut, '') AS socio_rut,
+                COALESCE(s.nombre_completo, '') AS socio_nombre,
+                COALESCE(u.nombre, u.usuario, CONCAT('Usuario #', COALESCE(u.id, 0)), 'Sistema') AS usuario_registro
+            FROM movimientos_tesoreria mt
+            LEFT JOIN pagos p
+              ON mt.origen_modulo = 'pagos'
+             AND mt.referencia_id = p.id
+            LEFT JOIN aportes a
+              ON mt.origen_modulo = 'aportes'
+             AND mt.referencia_id = a.id
+            LEFT JOIN egresos e
+              ON mt.origen_modulo = 'egresos'
+             AND mt.referencia_id = e.id
+            LEFT JOIN socios s
+              ON s.id = CASE
+                  WHEN mt.origen_modulo = 'pagos' THEN p.socio_id
+                  WHEN mt.origen_modulo = 'aportes' THEN a.socio_id
+                  ELSE NULL
+              END
+            LEFT JOIN usuarios u
+              ON u.id = COALESCE(p.usuario_id, a.usuario_id, e.usuario_id)
+            {$whereSql}
         ";
 
         $stmt = $db->prepare($sql);
@@ -1182,7 +1192,7 @@ abstract class Controller
             }
 
             if ($queryLower !== '') {
-                $haystack = mb_strtolower(trim((string) (($row['descripcion'] ?? '') . ' ' . ($row['origen_modulo'] ?? '') . ' ' . ($row['socio_nombre'] ?? '') . ' ' . ($row['socio_rut'] ?? ''))));
+                $haystack = mb_strtolower(trim((string) (($row['descripcion'] ?? '') . ' ' . ($row['origen_modulo'] ?? '') . ' ' . ($row['socio_nombre'] ?? '') . ' ' . ($row['socio_rut'] ?? '') . ' ' . ($row['usuario_registro'] ?? ''))));
                 if (!str_contains($haystack, $queryLower)) {
                     return false;
                 }
