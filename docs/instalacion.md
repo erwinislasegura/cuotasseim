@@ -7,3 +7,5 @@
 6. Aplicar migraciones con `php database/migration_runner.php`.
 7. Verificar/reparar tablas faltantes con `php database/check_and_repair_schema.php` (opcional, recomendado si un módulo no carga).
 8. Publicar `public/` como DocumentRoot en Apache.
+9. Si `configuracion` no guarda o faltan columnas Flow, ejecutar script MySQL:
+   `mysql -u usuario -p nombre_base < database/mysql_fix_configuracion.sql`.
