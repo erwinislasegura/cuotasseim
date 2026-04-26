@@ -684,6 +684,7 @@ class ModuleCatalog
         }
 
         $db = Database::connection();
+        $canResolveUsers = self::tableExists('usuarios');
         $excluded = ['auditoria', 'migrations'];
         $tablesStmt = $db->query('SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()');
         $tables = array_map(static fn(array $row): string => (string) ($row['table_name'] ?? ''), $tablesStmt->fetchAll());
@@ -719,7 +720,7 @@ class ModuleCatalog
                 }
             }
 
-            $usuarioExpr = $userColumn !== null
+            $usuarioExpr = ($userColumn !== null && $canResolveUsers)
                 ? "(SELECT u.id FROM usuarios u WHERE u.id = t.`{$userColumn}` LIMIT 1)"
                 : 'NULL';
             $fechaExpr = $dateColumn !== null ? "COALESCE(t.`{$dateColumn}`, NOW())" : 'NOW()';
@@ -732,7 +733,7 @@ class ModuleCatalog
                     :modulo,
                     'registro_detectado',
                     t.`{$primaryKey}`,
-                    JSON_OBJECT('tabla', :modulo, 'registro_id', t.`{$primaryKey}`),
+                    CONCAT('{\"tabla\":\"', :modulo, '\",\"registro_id\":', t.`{$primaryKey}`, '}'),
                     {$fechaExpr},
                     NULL,
                     'bootstrap_sync'
