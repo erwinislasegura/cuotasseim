@@ -12,6 +12,8 @@ class Router
     private array $publicRoutes = [
         '/',
         '/login',
+        '/pago-flow',
+        '/pago-flow/crear',
     ];
 
     public function dispatch(string $method, string $uri): void
