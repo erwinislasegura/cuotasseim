@@ -233,6 +233,13 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
         <?php endif; ?>
 
         <?php foreach (($formFields ?? []) as $field): ?>
+          <?php if (($route ?? '') === 'configuracion' && (string) $field === 'nombre_organizacion'): ?>
+            <div class="col-12"><div class="card mb-2"><div class="card-body"><div class="row g-2">
+          <?php endif; ?>
+          <?php if (($route ?? '') === 'configuracion' && (string) $field === 'flow_api_key'): ?>
+            </div></div></div></div>
+            <div class="col-12"><div class="card mb-2"><div class="card-body"><div class="row g-2">
+          <?php endif; ?>
           <?php
             $rawFieldValue = $currentRecord[$field] ?? '';
             $value = is_array($rawFieldValue) ? '' : (string) ($rawFieldValue ?: '');
@@ -323,6 +330,9 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
             <?php endif; ?>
           </div>
         <?php endforeach; ?>
+        <?php if (($route ?? '') === 'configuracion' && !empty($formFields ?? [])): ?>
+            </div></div></div></div>
+        <?php endif; ?>
 
         <?php if (($route ?? '') === 'egresos'): ?>
           <div class="col-12">
