@@ -94,7 +94,7 @@
                 <input type="hidden" name="socio_id" value="<?= (int) ($socio['id'] ?? 0) ?>">
                 <?php
                   $cuotasSeleccionables = [];
-                  if (!empty($cuotaPorVencer) && (int) ($cuotaPorVencer['id'] ?? 0) > 0) {
+                  if (!empty($cuotaPorVencer)) {
                     $cuotasSeleccionables[] = $cuotaPorVencer;
                   }
                   if (!empty($otrasCuotas ?? [])) {
@@ -118,6 +118,9 @@
                           $venceItem = !empty($cuotaItem['fecha_vencimiento']) ? human_date((string) $cuotaItem['fecha_vencimiento']) : '-';
                           $labelPeriodo = trim((string) ($cuotaItem['nombre_periodo'] ?? ('Cuota #' . $cuotaId)));
                           $label = $labelPeriodo . ' · ' . $tipoPeriodoItem . ' · Vence: ' . $venceItem . ' · Saldo: ' . money($saldoPendienteItem);
+                          if ($cuotaId <= 0) {
+                            $label .= ' · (se generará automáticamente)';
+                          }
                         ?>
                         <option
                           value="<?= $cuotaId ?>"
