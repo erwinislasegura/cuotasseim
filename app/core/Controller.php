@@ -318,6 +318,10 @@ abstract class Controller
         }
 
         try {
+            if (($config['table'] ?? '') === 'configuracion') {
+                $this->ensureFlowConfigColumns();
+            }
+
             $data = ModuleCatalog::fetchData(
                 $config,
                 $query,
@@ -584,32 +588,49 @@ abstract class Controller
             }
 
             if ($config['table'] === 'configuracion') {
-                $formFields = array_values(array_filter($data['columns']['form'], static fn(string $field): bool => $field !== 'logo'));
+                $formFields = array_values(array_intersect([
+                    'nombre_organizacion',
+                    'nombre_sistema',
+                    'rut_organizacion',
+                    'direccion',
+                    'telefono',
+                    'correo',
+                    'flow_api_key',
+                    'flow_secret_key',
+                    'flow_modo_sandbox',
+                ], $data['columns']['form']));
                 $formMeta = [
                     'types' => [
                         'correo' => 'email',
-                        'sitio_web' => 'url',
-                        'texto_comprobante' => 'textarea',
-                        'observaciones_generales' => 'textarea',
-                        'cuota_por_defecto' => 'number',
+                        'flow_modo_sandbox' => 'select',
+                    ],
+                    'options' => [
+                        'flow_modo_sandbox' => [
+                            ['value' => '1', 'label' => 'Sí (Sandbox)'],
+                            ['value' => '0', 'label' => 'No (Producción)'],
+                        ],
                     ],
                     'labels' => [
-                        'nombre_organizacion' => 'Organización',
+                        'nombre_organizacion' => 'Nombre institución',
                         'nombre_sistema' => 'Nombre del sistema',
-                        'rut_organizacion' => 'RUT',
-                        'direccion' => 'Dirección',
-                        'telefono' => 'Teléfono',
-                        'correo' => 'Correo',
-                        'sitio_web' => 'Sitio web',
-                        'cuota_por_defecto' => 'Cuota por defecto',
-                        'moneda' => 'Moneda',
-                        'simbolo_moneda' => 'Símbolo',
-                        'texto_comprobante' => 'Texto en comprobante',
-                        'observaciones_generales' => 'Observaciones',
-                        'logo' => 'Logo institucional',
+                        'rut_organizacion' => 'RUT institución',
+                        'direccion' => 'Dirección institucional',
+                        'telefono' => 'Teléfono institucional',
+                        'correo' => 'Correo institucional',
+                        'flow_api_key' => 'Flow Api Key',
+                        'flow_secret_key' => 'Flow Secret Key',
+                        'flow_modo_sandbox' => 'Flow Modo Sandbox',
                     ],
-                    'attributes' => [
-                        'cuota_por_defecto' => ['step' => '0.01', 'min' => '0'],
+                    'required' => [
+                        'nombre_organizacion' => true,
+                        'nombre_sistema' => true,
+                        'rut_organizacion' => true,
+                        'direccion' => true,
+                        'telefono' => true,
+                        'correo' => true,
+                        'flow_api_key' => true,
+                        'flow_secret_key' => true,
+                        'flow_modo_sandbox' => true,
                     ],
                 ];
                 $columnLabels = $formMeta['labels'];
@@ -1181,6 +1202,33 @@ abstract class Controller
                 'extraFilters' => [],
                 'extraQueryParams' => [],
             ]);
+        }
+    }
+
+
+    private function ensureFlowConfigColumns(): void
+    {
+        $db = Database::connection();
+
+        $required = [
+            'flow_checkout_activo' => "ALTER TABLE configuracion ADD COLUMN flow_checkout_activo TINYINT(1) NOT NULL DEFAULT 0 AFTER sitio_web",
+            'flow_api_key' => "ALTER TABLE configuracion ADD COLUMN flow_api_key VARCHAR(120) NULL AFTER flow_checkout_activo",
+            'flow_secret_key' => "ALTER TABLE configuracion ADD COLUMN flow_secret_key VARCHAR(140) NULL AFTER flow_api_key",
+            'flow_modo_sandbox' => "ALTER TABLE configuracion ADD COLUMN flow_modo_sandbox TINYINT(1) NOT NULL DEFAULT 1 AFTER flow_secret_key",
+            'flow_url_confirmacion' => "ALTER TABLE configuracion ADD COLUMN flow_url_confirmacion VARCHAR(255) NULL AFTER flow_modo_sandbox",
+            'flow_url_retorno' => "ALTER TABLE configuracion ADD COLUMN flow_url_retorno VARCHAR(255) NULL AFTER flow_url_confirmacion",
+        ];
+
+        foreach ($required as $column => $sql) {
+            $stmt = $db->prepare('SHOW COLUMNS FROM configuracion LIKE :column_name');
+            $stmt->bindValue(':column_name', $column);
+            $stmt->execute();
+            $exists = $stmt->fetch();
+            if ($exists) {
+                continue;
+            }
+
+            $db->exec($sql);
         }
     }
 
