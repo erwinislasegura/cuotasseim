@@ -1,6 +1,7 @@
 <?php
 $currentPath = trim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH), '/');
 $currentPath = $currentPath === '' ? 'panel' : $currentPath;
+$currentRoot = explode('/', $currentPath)[0] ?? 'panel';
 
 $menu = [
     'Operación' => [
@@ -40,19 +41,22 @@ $menu = [
 </div>
 
 <?php foreach ($menu as $group => $items): ?>
-  <p class="sidebar-label"><?= htmlspecialchars($group) ?></p>
-  <ul class="nav flex-column sidebar-nav mb-2">
-    <?php foreach ($items as $item): ?>
-      <?php
-      $isActive = $currentPath === trim((string) $item['route'], '/');
-      $classes = 'nav-link' . ($isActive ? ' is-active' : '');
-      ?>
-      <li class="nav-item">
-        <a class="<?= htmlspecialchars($classes) ?>" href="<?= htmlspecialchars(url((string) $item['route'])) ?>">
-          <i class="bi <?= htmlspecialchars((string) $item['icon']) ?>"></i>
-          <span><?= htmlspecialchars((string) $item['label']) ?></span>
-        </a>
-      </li>
-    <?php endforeach; ?>
-  </ul>
+  <section class="sidebar-group">
+    <p class="sidebar-label"><?= htmlspecialchars($group) ?></p>
+    <ul class="nav flex-column sidebar-nav mb-2">
+      <?php foreach ($items as $item): ?>
+        <?php
+        $itemRoute = trim((string) $item['route'], '/');
+        $isActive = $currentRoot === $itemRoute;
+        $classes = 'nav-link' . ($isActive ? ' is-active' : '');
+        ?>
+        <li class="nav-item">
+          <a class="<?= htmlspecialchars($classes) ?>" href="<?= htmlspecialchars(url((string) $item['route'])) ?>" <?= $isActive ? 'aria-current="page"' : '' ?>>
+            <i class="bi <?= htmlspecialchars((string) $item['icon']) ?>"></i>
+            <span><?= htmlspecialchars((string) $item['label']) ?></span>
+          </a>
+        </li>
+      <?php endforeach; ?>
+    </ul>
+  </section>
 <?php endforeach; ?>
