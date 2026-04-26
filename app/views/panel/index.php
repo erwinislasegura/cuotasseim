@@ -109,7 +109,7 @@
         <div class="d-grid gap-2 mt-3">
           <a href="<?= htmlspecialchars(url('pagos')) ?>" class="btn btn-sm btn-primary">Registrar pago</a>
           <a href="<?= htmlspecialchars(url('cuotas')) ?>" class="btn btn-sm btn-outline-secondary">Revisar cuotas pendientes</a>
-          <a href="<?= htmlspecialchars(url('tesoreria')) ?>" class="btn btn-sm btn-outline-secondary">Ver tesorería</a>
+          <a href="<?= htmlspecialchars(url('reportes')) ?>" class="btn btn-sm btn-outline-secondary">Ver reportes</a>
         </div>
       </div>
     </div>
