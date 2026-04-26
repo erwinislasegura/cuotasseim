@@ -132,6 +132,12 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
 
         <?php if (($route ?? '') === 'configuracion'): ?>
           <div class="col-12">
+            <div class="alert alert-info small mb-2">
+              <strong>Flow Checkout:</strong> completa <code>flow_checkout_activo</code>, <code>flow_api_key</code>, <code>flow_secret_key</code>, <code>flow_modo_sandbox</code>, <code>flow_url_confirmacion</code> y <code>flow_url_retorno</code>.
+              <br>Vista pública de pago: <a href="<?= htmlspecialchars(url('pago-flow')) ?>" target="_blank" rel="noopener"><?= htmlspecialchars(url('pago-flow')) ?></a>.
+            </div>
+          </div>
+          <div class="col-12">
             <label class="form-label">Logo institucional</label>
             <input type="file" name="logo_file" class="form-control form-control-sm" accept=".png,.jpg,.jpeg,.webp,.svg,image/*">
             <?php $logoActual = trim((string) ($currentRecord['logo'] ?? '')); ?>
