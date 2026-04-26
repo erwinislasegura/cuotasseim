@@ -63,31 +63,55 @@ body {
   font-size: 1rem;
 }
 
+.sidebar-group {
+  margin-bottom: 0.6rem;
+}
+
+.sidebar-nav {
+  gap: 0.2rem;
+}
+
 .sidebar-nav .nav-link {
-  color: rgba(235, 243, 255, 0.82);
-  border-radius: 0.6rem;
-  padding: 0.5rem 0.6rem;
+  color: rgba(235, 243, 255, 0.84);
+  border-radius: 0.72rem;
+  padding: 0.56rem 0.68rem;
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  margin-bottom: 0.22rem;
+  gap: 0.6rem;
   font-size: 0.835rem;
-  transition: all 0.15s ease;
+  border: 1px solid transparent;
+  transition: all 0.16s ease;
+}
+
+.sidebar-nav .nav-link i {
+  width: 1rem;
+  text-align: center;
+  color: rgba(213, 229, 247, 0.9);
 }
 
 .sidebar-nav .nav-link:hover,
-.sidebar-nav .nav-link:focus,
-.sidebar-nav .nav-link.is-active {
+.sidebar-nav .nav-link:focus {
   color: #ffffff;
-  background: rgba(109, 156, 210, 0.28);
+  background: rgba(109, 156, 210, 0.2);
+  border-color: rgba(153, 188, 225, 0.26);
 }
 
+.sidebar-nav .nav-link.is-active {
+  color: #ffffff;
+  background: linear-gradient(90deg, rgba(101, 151, 206, 0.5) 0%, rgba(83, 133, 189, 0.35) 100%);
+  border-color: rgba(172, 203, 236, 0.48);
+  font-weight: 600;
+  box-shadow: 0 6px 14px rgba(8, 24, 42, 0.2);
+}
+
+
 .sidebar-label {
-  color: rgba(210, 226, 246, 0.7);
-  font-size: 0.69rem;
-  letter-spacing: 0.08em;
+  color: rgba(198, 220, 245, 0.68);
+  font-size: 0.67rem;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
-  margin: 0.95rem 0 0.45rem 0.4rem;
+  margin: 0.95rem 0 0.45rem 0.48rem;
+  font-weight: 700;
 }
 
 .main-content {
@@ -170,6 +194,26 @@ body {
 
 .btn-outline-secondary { border-color: #c8d3df; color: #3f556d; }
 .btn-light { background: #f9fbfe; border-color: #dce6f1; }
+
+.report-filters .filter-search .form-control { min-width: 220px; }
+.report-filters .filter-status .form-select { min-width: 130px; }
+.report-filters .filter-date .form-control { min-width: 145px; }
+.report-filters .filter-periodo .form-select { min-width: 170px; }
+.report-filters .filter-socio .form-select { min-width: 290px; }
+.report-filters .filter-movimiento .form-select { min-width: 170px; }
+.report-filters .filter-monto .form-control { min-width: 120px; }
+
+@media (max-width: 768px) {
+  .report-filters .col-sm-auto {
+    width: 100%;
+  }
+
+  .report-filters .form-control,
+  .report-filters .form-select {
+    min-width: 0 !important;
+    width: 100%;
+  }
+}
 
 .egreso-flow-hint {
   border: 1px dashed #c8d8ea;
@@ -299,6 +343,28 @@ body {
   font-weight: 500;
   line-height: 1.28;
   word-break: break-word;
+}
+
+
+.module-highlight {
+  border: 1px solid #d5e1ee;
+  border-radius: 0.75rem;
+  background: linear-gradient(180deg, #f8fbff 0%, #f2f7fd 100%);
+  padding: 0.68rem 0.82rem;
+}
+
+.module-highlight-title {
+  color: #173a60;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.15rem;
+}
+
+.module-highlight-text {
+  color: #4a617a;
+  font-size: 0.76rem;
+  line-height: 1.35;
 }
 
 .kpi-card { position: relative; overflow: hidden; }
