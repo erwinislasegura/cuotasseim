@@ -945,10 +945,10 @@ abstract class Controller
                     ],
                     'origenes' => [
                         ['value' => '', 'label' => 'Todos los movimientos'],
-                        ['value' => 'pagos', 'label' => 'Pagos'],
-                        ['value' => 'aportes', 'label' => 'Aportes'],
-                        ['value' => 'egresos', 'label' => 'Egresos'],
-                        ['value' => 'manual', 'label' => 'Manual'],
+                        ['value' => 'pago_cuotas', 'label' => 'Pago de cuotas'],
+                        ['value' => 'aporte', 'label' => 'Aporte'],
+                        ['value' => 'retiro', 'label' => 'Retiro'],
+                        ['value' => 'manual', 'label' => 'Manual / ajuste'],
                     ],
                     'socios' => array_map(static function (array $item): array {
                         $nombre = trim((string) ($item['nombre_completo'] ?? ''));
@@ -1213,7 +1213,7 @@ abstract class Controller
                 p.id,
                 p.fecha_pago AS fecha,
                 'ingreso' AS tipo_movimiento,
-                'pagos' AS origen_modulo,
+                'Pago de cuotas' AS origen_modulo,
                 p.id AS referencia_id,
                 CONCAT('Pago cuota ', COALESCE(p.numero_comprobante, CONCAT('#', p.id)), ' · ', COALESCE(s.nombre_completo, 'Socio')) AS descripcion,
                 COALESCE(p.monto_total, 0) AS ingreso,
@@ -1236,7 +1236,7 @@ abstract class Controller
                 a.id,
                 a.fecha_aporte AS fecha,
                 'ingreso' AS tipo_movimiento,
-                'aportes' AS origen_modulo,
+                'Aporte' AS origen_modulo,
                 a.id AS referencia_id,
                 CONCAT('Aporte ', COALESCE(a.comentario, a.descripcion, ''), ' · ', COALESCE(s.nombre_completo, a.nombre_aportante, 'Aportante')) AS descripcion,
                 COALESCE(a.monto, 0) AS ingreso,
@@ -1259,7 +1259,7 @@ abstract class Controller
                 e.id,
                 e.fecha AS fecha,
                 'egreso' AS tipo_movimiento,
-                'egresos' AS origen_modulo,
+                'Retiro' AS origen_modulo,
                 e.id AS referencia_id,
                 CONCAT('Retiro ', COALESCE(e.numero_documento, CONCAT('#', e.id)), ' · ', COALESCE(e.proveedor_destinatario, ''), ' · ', COALESCE(e.descripcion, '')) AS descripcion,
                 0 AS ingreso,
@@ -1281,7 +1281,17 @@ abstract class Controller
                 mt.id,
                 mt.fecha,
                 mt.tipo_movimiento,
-                mt.origen_modulo,
+                CASE
+                    WHEN mt.origen_modulo LIKE 'ajuste_pagos%' THEN 'Pago de cuotas'
+                    WHEN mt.origen_modulo LIKE 'ajuste_aportes%' THEN 'Aporte'
+                    WHEN mt.origen_modulo LIKE 'ajuste_egresos%' THEN 'Retiro'
+                    WHEN mt.origen_modulo = 'pagos' THEN 'Pago de cuotas'
+                    WHEN mt.origen_modulo = 'aportes' THEN 'Aporte'
+                    WHEN mt.origen_modulo = 'egresos' THEN 'Retiro'
+                    WHEN mt.tipo_movimiento = 'egreso' THEN 'Retiro'
+                    WHEN mt.tipo_movimiento = 'ingreso' THEN 'Ingreso manual'
+                    ELSE 'Manual'
+                END AS origen_modulo,
                 mt.referencia_id,
                 COALESCE(mt.descripcion, '') AS descripcion,
                 COALESCE(mt.ingreso, 0) AS ingreso,
@@ -1331,8 +1341,19 @@ abstract class Controller
             if ($status !== '' && $tipo !== $status) {
                 return false;
             }
-            if ($origenFiltro !== '' && mb_strtolower((string) ($row['origen_modulo'] ?? '')) !== $origenFiltro) {
-                return false;
+            if ($origenFiltro !== '') {
+                $origenTexto = mb_strtolower(trim((string) ($row['origen_modulo'] ?? '')));
+                $origenNormalizado = 'manual';
+                if (str_contains($origenTexto, 'pago')) {
+                    $origenNormalizado = 'pago_cuotas';
+                } elseif (str_contains($origenTexto, 'aporte')) {
+                    $origenNormalizado = 'aporte';
+                } elseif (str_contains($origenTexto, 'retiro') || str_contains($origenTexto, 'egreso')) {
+                    $origenNormalizado = 'retiro';
+                }
+                if ($origenNormalizado !== $origenFiltro) {
+                    return false;
+                }
             }
 
             if ($socioFilter > 0) {
