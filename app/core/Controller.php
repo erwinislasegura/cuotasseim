@@ -54,6 +54,7 @@ abstract class Controller
             $socioId = (int) ($_GET['socio_id'] ?? 0);
             $montoMin = trim((string) ($_GET['monto_min'] ?? ''));
             $montoMax = trim((string) ($_GET['monto_max'] ?? ''));
+            $origenModulo = trim((string) ($_GET['origen_modulo'] ?? ''));
 
             if ($periodPreset !== '') {
                 $today = new \DateTimeImmutable('today');
@@ -127,6 +128,7 @@ abstract class Controller
                 'socio_id' => $socioId > 0 ? (string) $socioId : '',
                 'monto_min' => $montoMin,
                 'monto_max' => $montoMax,
+                'origen_modulo' => $origenModulo,
             ];
 
             foreach ($extraFilters as $key => $value) {
@@ -256,6 +258,11 @@ abstract class Controller
                     $row['ingreso'] = '$' . number_format((float) ($row['ingreso'] ?? 0), 0, ',', '.');
                     $row['egreso'] = '$' . number_format((float) ($row['egreso'] ?? 0), 0, ',', '.');
                     $row['saldo_referencial'] = '$' . number_format((float) ($row['saldo_referencial'] ?? 0), 0, ',', '.');
+                    $descripcion = trim((string) ($row['descripcion'] ?? ''));
+                    if (mb_strlen($descripcion) > 64) {
+                        $descripcion = mb_substr($descripcion, 0, 61) . '...';
+                    }
+                    $row['descripcion'] = $descripcion;
                     return $row;
                 }, $rendicionesResult['rows']),
                 'columns' => ['row_id', 'fecha', 'tipo_movimiento', 'origen_modulo', 'referencia_id', 'socio_nombre', 'socio_rut', 'descripcion', 'ingreso', 'egreso', 'saldo_referencial', 'usuario_registro'],
@@ -936,6 +943,13 @@ abstract class Controller
                         ['value' => 'trimestre_actual', 'label' => 'Trimestre actual'],
                         ['value' => 'anio_actual', 'label' => 'Año actual'],
                     ],
+                    'origenes' => [
+                        ['value' => '', 'label' => 'Todos los movimientos'],
+                        ['value' => 'pagos', 'label' => 'Pagos'],
+                        ['value' => 'aportes', 'label' => 'Aportes'],
+                        ['value' => 'egresos', 'label' => 'Egresos'],
+                        ['value' => 'manual', 'label' => 'Manual'],
+                    ],
                     'socios' => array_map(static function (array $item): array {
                         $nombre = trim((string) ($item['nombre_completo'] ?? ''));
                         $rut = trim((string) ($item['rut'] ?? ''));
@@ -1309,11 +1323,15 @@ abstract class Controller
         }
         $montoMin = (string) ($extraFilters['monto_min'] ?? '');
         $montoMax = (string) ($extraFilters['monto_max'] ?? '');
+        $origenFiltro = mb_strtolower(trim((string) ($extraFilters['origen_modulo'] ?? '')));
         $queryLower = mb_strtolower(trim($query));
 
-        $filtered = array_values(array_filter($allRows, static function (array $row) use ($status, $socioFilter, $socioFilterRut, $socioFilterNombre, $montoMin, $montoMax, $queryLower): bool {
+        $filtered = array_values(array_filter($allRows, static function (array $row) use ($status, $socioFilter, $socioFilterRut, $socioFilterNombre, $montoMin, $montoMax, $origenFiltro, $queryLower): bool {
             $tipo = (string) ($row['tipo_movimiento'] ?? '');
             if ($status !== '' && $tipo !== $status) {
+                return false;
+            }
+            if ($origenFiltro !== '' && mb_strtolower((string) ($row['origen_modulo'] ?? '')) !== $origenFiltro) {
                 return false;
             }
 

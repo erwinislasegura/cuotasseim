@@ -646,6 +646,17 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
           </select>
         </div>
         <div class="col-sm-auto">
+          <label class="form-label">Movimiento</label>
+          <select name="origen_modulo" class="form-select form-select-sm">
+            <?php foreach (($formMeta['reportes_filter_options']['origenes'] ?? []) as $option): ?>
+              <?php $originValue = (string) ($option['value'] ?? ''); ?>
+              <option value="<?= htmlspecialchars($originValue) ?>" <?= (string) ($extraFilters['origen_modulo'] ?? '') === $originValue ? 'selected' : '' ?>>
+                <?= htmlspecialchars((string) ($option['label'] ?? '')) ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-sm-auto">
           <label class="form-label">Monto min</label>
           <input type="number" step="0.01" min="0" name="monto_min" value="<?= htmlspecialchars((string) ($extraFilters['monto_min'] ?? '')) ?>" class="form-control form-control-sm" placeholder="0">
         </div>
@@ -821,6 +832,13 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
     <div class="d-flex align-items-center gap-2">
       <?php $prev = max(1, (int) ($page - 1)); $next = min((int) ($pages ?? 1), (int) ($page + 1));
       $queryBase = '?q=' . urlencode((string) ($query ?? '')) . '&status=' . urlencode((string) ($status ?? '')) . '&from=' . urlencode((string) ($from ?? '')) . '&to=' . urlencode((string) ($to ?? ''));
+      if (($route ?? '') === 'reportes') {
+        $queryBase .= '&periodo=' . urlencode((string) ($extraFilters['periodo'] ?? ''));
+        $queryBase .= '&socio_id=' . urlencode((string) ($extraFilters['socio_id'] ?? ''));
+        $queryBase .= '&origen_modulo=' . urlencode((string) ($extraFilters['origen_modulo'] ?? ''));
+        $queryBase .= '&monto_min=' . urlencode((string) ($extraFilters['monto_min'] ?? ''));
+        $queryBase .= '&monto_max=' . urlencode((string) ($extraFilters['monto_max'] ?? ''));
+      }
       ?>
       <a class="btn btn-outline-secondary btn-sm <?= ($page <= 1) ? 'disabled' : '' ?>" href="<?= htmlspecialchars(url(($route ?? '') . $queryBase . '&page=' . $prev)) ?>">Anterior</a>
       <span>Página <?= (int) ($page ?? 1) ?> / <?= (int) ($pages ?? 1) ?></span>
