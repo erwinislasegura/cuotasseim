@@ -1,5 +1,20 @@
 <?php
-$currentPath = trim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH), '/');
+$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+$scriptDir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/');
+
+if ($scriptDir !== '' && $scriptDir !== '.' && str_starts_with($requestPath, $scriptDir)) {
+    $requestPath = substr($requestPath, strlen($scriptDir)) ?: '/';
+}
+
+$frontController = '/' . ltrim(basename((string) ($_SERVER['SCRIPT_NAME'] ?? 'index.php')), '/');
+
+if ($requestPath === $frontController) {
+    $requestPath = '/';
+} elseif (str_starts_with($requestPath, $frontController . '/')) {
+    $requestPath = substr($requestPath, strlen($frontController)) ?: '/';
+}
+
+$currentPath = trim((string) $requestPath, '/');
 $currentPath = $currentPath === '' ? 'panel' : $currentPath;
 $currentRoot = explode('/', $currentPath)[0] ?? 'panel';
 
