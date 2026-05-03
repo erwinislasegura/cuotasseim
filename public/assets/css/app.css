@@ -472,3 +472,41 @@ body {
 .cuotas-data-list div:last-child { border-bottom: 0; }
 .cuotas-data-list span { color: #6b8098; font-size: 0.7rem; }
 .cuotas-data-list strong { font-size: 0.78rem; text-align: right; }
+
+
+.landing-body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f2f4f7;
+}
+
+.landing-page {
+  flex: 1 0 auto;
+}
+
+.landing-hero {
+  background: linear-gradient(180deg, #2f3a46 0%, #242d37 100%);
+  color: #eef2f6;
+  border-bottom: 1px solid #d7dde4;
+}
+
+.landing-hero .lead {
+  color: #d6dde6;
+  max-width: 720px;
+}
+
+.landing-footer {
+  background: #1f2730;
+  color: #ced6df;
+  border-top: 1px solid #394653;
+}
+
+.landing-footer a {
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.landing-footer a:hover {
+  text-decoration: underline;
+}
