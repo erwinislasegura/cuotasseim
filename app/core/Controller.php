@@ -423,15 +423,27 @@ abstract class Controller
 
                 if (!$isReadOnly && $action === 'delete' && $id !== null && $id > 0) {
                     $deletedRecord = ModuleCatalog::findById($config['table'], $primaryKey, $id);
-                    ModuleCatalog::delete($config['table'], $primaryKey, $id, $columnsMeta['has_deleted_at']);
-                    ModuleCatalog::registerAudit(
-                        (string) ($config['route'] ?? $moduleKey),
-                        'eliminar',
-                        $id,
-                        is_array($deletedRecord) ? $deletedRecord : null,
-                        null
-                    );
-                    $_SESSION['flash_success'] = 'Registro eliminado correctamente.';
+
+                    try {
+                        ModuleCatalog::delete($config['table'], $primaryKey, $id, $columnsMeta['has_deleted_at']);
+                        ModuleCatalog::registerAudit(
+                            (string) ($config['route'] ?? $moduleKey),
+                            'eliminar',
+                            $id,
+                            is_array($deletedRecord) ? $deletedRecord : null,
+                            null
+                        );
+                        $_SESSION['flash_success'] = 'Registro eliminado correctamente.';
+                    } catch (\PDOException $exception) {
+                        $errorCode = (string) ($exception->errorInfo[1] ?? '');
+                        if ($errorCode === '1451') {
+                            $_SESSION['flash_error'] = 'No se puede eliminar el registro porque tiene datos relacionados.';
+                        } else {
+                            $_SESSION['flash_error'] = 'No se pudo eliminar el registro. Inténtalo nuevamente.';
+                        }
+                    } catch (\Throwable $exception) {
+                        $_SESSION['flash_error'] = 'No se pudo eliminar el registro. Inténtalo nuevamente.';
+                    }
                 }
 
                 $this->redirect('/' . $config['route']);
