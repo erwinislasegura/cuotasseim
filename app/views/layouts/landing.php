@@ -7,7 +7,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="<?= htmlspecialchars(url('public/assets/css/app.css')) ?>" rel="stylesheet">
 </head>
-<body>
+<body class="landing-body">
 <?= $content ?>
 </body>
 </html>
