@@ -647,6 +647,10 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
         <input type="date" name="to" class="form-control form-control-sm" value="<?= htmlspecialchars((string) ($to ?? '')) ?>">
       </div>
       <?php if (($route ?? '') === 'reportes'): ?>
+        <div class="col-sm-auto filter-year">
+          <label class="form-label">Año</label>
+          <input type="number" min="2000" max="2100" name="anio" value="<?= htmlspecialchars((string) ($extraFilters['anio'] ?? '')) ?>" class="form-control form-control-sm" placeholder="Ej: 2026">
+        </div>
         <div class="col-sm-auto filter-periodo">
           <label class="form-label">Periodo</label>
           <select name="periodo" class="form-select form-select-sm">
