@@ -55,6 +55,7 @@ abstract class Controller
             $montoMin = trim((string) ($_GET['monto_min'] ?? ''));
             $montoMax = trim((string) ($_GET['monto_max'] ?? ''));
             $origenModulo = trim((string) ($_GET['origen_modulo'] ?? ''));
+            $anio = max(0, (int) ($_GET['anio'] ?? 0));
 
             if ($periodPreset !== '') {
                 $today = new \DateTimeImmutable('today');
@@ -75,6 +76,11 @@ abstract class Controller
                     $from = $today->modify('first day of january')->format('Y-m-d');
                     $to = $today->modify('last day of december')->format('Y-m-d');
                 }
+            }
+
+            if ($anio > 0) {
+                $from = sprintf('%04d-01-01', $anio);
+                $to = sprintf('%04d-12-31', $anio);
             }
 
             if ($socioId > 0) {
@@ -129,6 +135,7 @@ abstract class Controller
                 'monto_min' => $montoMin,
                 'monto_max' => $montoMax,
                 'origen_modulo' => $origenModulo,
+                'anio' => $anio > 0 ? (string) $anio : '',
             ];
 
             foreach ($extraFilters as $key => $value) {
