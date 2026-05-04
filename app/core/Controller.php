@@ -41,6 +41,8 @@ abstract class Controller
 
         $query = trim((string) ($_GET['q'] ?? ''));
         $status = trim((string) ($_GET['status'] ?? ''));
+        $queryNombre = trim((string) ($_GET['q_nombre'] ?? ''));
+        $queryRut = trim((string) ($_GET['q_rut'] ?? ''));
         $from = trim((string) ($_GET['from'] ?? ''));
         $to = trim((string) ($_GET['to'] ?? ''));
         $page = max(1, (int) ($_GET['page'] ?? 1));
@@ -48,6 +50,27 @@ abstract class Controller
         $extraFilters = [];
         $extraConditions = [];
         $extraQueryParams = [];
+
+
+        if (($config['route'] ?? '') === 'pagos') {
+            if ($queryNombre !== '') {
+                $extraConditions[] = [
+                    'sql' => 'EXISTS (SELECT 1 FROM socios s WHERE s.id = pagos.socio_id AND s.deleted_at IS NULL AND s.nombre_completo LIKE :pago_socio_nombre)',
+                    'params' => [':pago_socio_nombre' => '%' . $queryNombre . '%'],
+                ];
+                $extraFilters['q_nombre'] = $queryNombre;
+                $extraQueryParams['q_nombre'] = $queryNombre;
+            }
+
+            if ($queryRut !== '') {
+                $extraConditions[] = [
+                    'sql' => 'EXISTS (SELECT 1 FROM socios s WHERE s.id = pagos.socio_id AND s.deleted_at IS NULL AND s.rut LIKE :pago_socio_rut)',
+                    'params' => [':pago_socio_rut' => '%' . $queryRut . '%'],
+                ];
+                $extraFilters['q_rut'] = $queryRut;
+                $extraQueryParams['q_rut'] = $queryRut;
+            }
+        }
 
         if (($config['route'] ?? '') === 'reportes') {
             $periodPreset = trim((string) ($_GET['periodo'] ?? ''));
@@ -982,7 +1005,28 @@ abstract class Controller
                 $formFields = [];
             }
 
-            if (($config['route'] ?? '') === 'reportes') {
+    
+        if (($config['route'] ?? '') === 'pagos') {
+            if ($queryNombre !== '') {
+                $extraConditions[] = [
+                    'sql' => 'EXISTS (SELECT 1 FROM socios s WHERE s.id = pagos.socio_id AND s.deleted_at IS NULL AND s.nombre_completo LIKE :pago_socio_nombre)',
+                    'params' => [':pago_socio_nombre' => '%' . $queryNombre . '%'],
+                ];
+                $extraFilters['q_nombre'] = $queryNombre;
+                $extraQueryParams['q_nombre'] = $queryNombre;
+            }
+
+            if ($queryRut !== '') {
+                $extraConditions[] = [
+                    'sql' => 'EXISTS (SELECT 1 FROM socios s WHERE s.id = pagos.socio_id AND s.deleted_at IS NULL AND s.rut LIKE :pago_socio_rut)',
+                    'params' => [':pago_socio_rut' => '%' . $queryRut . '%'],
+                ];
+                $extraFilters['q_rut'] = $queryRut;
+                $extraQueryParams['q_rut'] = $queryRut;
+            }
+        }
+
+        if (($config['route'] ?? '') === 'reportes') {
                 $sociosStmt = Database::connection()->query('SELECT id, nombre_completo, rut, numero_socio FROM socios WHERE deleted_at IS NULL ORDER BY nombre_completo ASC');
                 $socios = $sociosStmt->fetchAll();
 
