@@ -19,6 +19,8 @@ class CuotasController extends Controller
 
         $q = trim((string) ($_GET['q'] ?? $_POST['q'] ?? ''));
         $selectedSocioId = max(0, (int) ($_GET['socio_id'] ?? $_POST['socio_id'] ?? 0));
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        $perPage = 50;
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $this->procesarRegistroPago($q, $selectedSocioId);
@@ -26,16 +28,27 @@ class CuotasController extends Controller
         }
 
         $socios = [];
+        $sociosTotal = 0;
+        $sociosPages = 1;
         $socio = null;
         $cuotaPorVencer = null;
         $otrasCuotas = [];
         $mediosPago = [];
         $sinPlanAsociado = false;
+        $planesSocio = [];
         $error = null;
 
         try {
             $db = Database::connection();
-            $socios = $this->buscarSocios($db, $q);
+            $sociosData = $this->buscarSocios($db, $q, $page, $perPage);
+            $socios = $sociosData['items'];
+            $sociosTotal = $sociosData['total'];
+            $sociosPages = max(1, (int) ceil($sociosTotal / $perPage));
+            if ($page > $sociosPages) {
+                $page = $sociosPages;
+                $sociosData = $this->buscarSocios($db, $q, $page, $perPage);
+                $socios = $sociosData['items'];
+            }
             $mediosPago = $this->obtenerMediosPago($db);
 
             if ($selectedSocioId <= 0 && $q !== '' && count($socios) === 1) {
@@ -46,18 +59,41 @@ class CuotasController extends Controller
                 $socio = $this->obtenerSocio($db, $selectedSocioId);
 
                 if ($socio !== null) {
+                    $planesSocio = $this->obtenerPlanesSocio($db, $selectedSocioId);
                     $cuotas = $this->obtenerCuotasOrdenadas($db, $selectedSocioId);
                     $cuotasPendientes = array_values(array_filter(
                         $cuotas,
                         static fn(array $cuota): bool => in_array((string) ($cuota['estado_cuota'] ?? ''), ['pendiente', 'vencida', 'abonada_parcial'], true)
                     ));
 
+                    $cuotasReferenciales = $this->obtenerCuotasReferencialesDesdePlanes($db, $selectedSocioId);
+
                     if (!empty($cuotasPendientes)) {
-                        $cuotaPorVencer = $cuotasPendientes[0];
-                        $otrasCuotas = array_slice($cuotasPendientes, 1);
+                        $cuotasSelector = $cuotasPendientes;
+
+                        $periodosConCuota = [];
+                        foreach ($cuotasPendientes as $cuotaPendiente) {
+                            $periodoIdCuota = (int) ($cuotaPendiente['periodo_id'] ?? 0);
+                            if ($periodoIdCuota > 0) {
+                                $periodosConCuota[$periodoIdCuota] = true;
+                            }
+                        }
+
+                        foreach ($cuotasReferenciales as $cuotaReferencial) {
+                            $periodoIdRef = (int) ($cuotaReferencial['periodo_id'] ?? 0);
+                            if ($periodoIdRef > 0 && !isset($periodosConCuota[$periodoIdRef])) {
+                                $cuotasSelector[] = $cuotaReferencial;
+                            }
+                        }
+
+                        $cuotaPorVencer = $cuotasSelector[0] ?? null;
+                        $otrasCuotas = array_slice($cuotasSelector, 1);
                     } else {
-                        $cuotaPorVencer = $this->obtenerCuotaActualDesdePlan($db, $selectedSocioId);
-                        $sinPlanAsociado = $cuotaPorVencer === null;
+                        if (!empty($cuotasReferenciales)) {
+                            $cuotaPorVencer = $cuotasReferenciales[0];
+                            $otrasCuotas = array_slice($cuotasReferenciales, 1);
+                        }
+                        $sinPlanAsociado = empty($cuotasReferenciales);
                     }
                 }
             }
@@ -75,11 +111,16 @@ class CuotasController extends Controller
             'q' => $q,
             'socios' => $socios,
             'selectedSocioId' => $selectedSocioId,
+            'page' => $page,
+            'sociosPages' => $sociosPages,
+            'perPage' => $perPage,
+            'sociosTotal' => $sociosTotal,
             'socio' => $socio,
             'cuotaPorVencer' => $cuotaPorVencer,
             'otrasCuotas' => $otrasCuotas,
             'mediosPago' => $mediosPago,
             'sinPlanAsociado' => $sinPlanAsociado,
+            'planesSocio' => $planesSocio,
             'token' => Csrf::token(),
             'flashSuccess' => $flashSuccess,
             'flashError' => $flashError,
@@ -95,7 +136,7 @@ class CuotasController extends Controller
         }
 
         $socioId = max(0, (int) ($_POST['socio_id'] ?? 0));
-        $cuotaId = max(0, (int) ($_POST['cuota_id'] ?? 0));
+        $cuotaId = (int) ($_POST['cuota_id'] ?? 0);
         $medioPagoId = max(0, (int) ($_POST['medio_pago_id'] ?? 0));
         $fechaPago = trim((string) ($_POST['fecha_pago'] ?? ''));
         $monto = (float) ($_POST['monto_pago'] ?? 0);
@@ -109,7 +150,8 @@ class CuotasController extends Controller
             $db = Database::connection();
 
             if ($cuotaId <= 0) {
-                $cuotaId = $this->crearCuotaDesdePlanActual($db, $socioId);
+                $periodoIdReferencia = abs($cuotaId);
+                $cuotaId = $this->crearCuotaDesdePlanActual($db, $socioId, $periodoIdReferencia > 0 ? $periodoIdReferencia : null);
                 if ($cuotaId <= 0) {
                     throw new \RuntimeException('No se pudo determinar una cuota para registrar el pago.');
                 }
@@ -124,25 +166,42 @@ class CuotasController extends Controller
         $this->redirect('/cuotas?q=' . urlencode($q) . '&socio_id=' . $socioId);
     }
 
-    /** @return array<int,array<string,mixed>> */
-    private function buscarSocios(\PDO $db, string $q): array
+    /** @return array{items: array<int,array<string,mixed>>, total:int} */
+    private function buscarSocios(\PDO $db, string $q, int $page, int $perPage): array
     {
+        $offset = max(0, ($page - 1) * $perPage);
+
         if ($q === '') {
-            $stmt = $db->query("SELECT id, numero_socio, nombre_completo, rut, correo, telefono FROM socios WHERE deleted_at IS NULL AND activo = 1 ORDER BY nombre_completo ASC LIMIT 30");
-            return $stmt->fetchAll();
+            $total = (int) ($db->query("SELECT COUNT(*) FROM socios WHERE deleted_at IS NULL AND activo = 1")->fetchColumn() ?: 0);
+            $stmt = $db->prepare("SELECT id, numero_socio, nombre_completo, rut, correo, telefono FROM socios WHERE deleted_at IS NULL AND activo = 1 ORDER BY nombre_completo ASC LIMIT :limit OFFSET :offset");
+            $stmt->bindValue(':limit', $perPage, \PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+            $stmt->execute();
+            return ['items' => $stmt->fetchAll() ?: [], 'total' => $total];
         }
+
+        $stmtCount = $db->prepare("SELECT COUNT(*)
+            FROM socios
+            WHERE deleted_at IS NULL
+              AND activo = 1
+              AND (nombre_completo LIKE :term OR rut LIKE :term)");
+        $stmtCount->bindValue(':term', '%' . $q . '%');
+        $stmtCount->execute();
+        $total = (int) ($stmtCount->fetchColumn() ?: 0);
 
         $stmt = $db->prepare("SELECT id, numero_socio, nombre_completo, rut, correo, telefono
             FROM socios
             WHERE deleted_at IS NULL
               AND activo = 1
-              AND (nombre_completo LIKE :term OR rut LIKE :term OR CONCAT(COALESCE(nombres, ''), ' ', COALESCE(apellidos, '')) LIKE :term)
+              AND (nombre_completo LIKE :term OR rut LIKE :term)
             ORDER BY nombre_completo ASC
-            LIMIT 50");
+            LIMIT :limit OFFSET :offset");
         $stmt->bindValue(':term', '%' . $q . '%');
+        $stmt->bindValue(':limit', $perPage, \PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
         $stmt->execute();
 
-        return $stmt->fetchAll();
+        return ['items' => $stmt->fetchAll() ?: [], 'total' => $total];
     }
 
     /** @return array<int,array<string,mixed>> */
@@ -162,10 +221,29 @@ class CuotasController extends Controller
         return $row ?: null;
     }
 
+
+    /** @return array<int,array<string,mixed>> */
+    private function obtenerPlanesSocio(\PDO $db, int $socioId): array
+    {
+        $stmt = $db->prepare("SELECT p.id, p.nombre_periodo, p.tipo_periodo
+            FROM socio_planes sp
+            INNER JOIN periodos p ON p.id = sp.periodo_id
+            WHERE sp.socio_id = :socio_id
+            ORDER BY sp.id DESC");
+        $stmt->bindValue(':socio_id', $socioId, \PDO::PARAM_INT);
+
+        try {
+            $stmt->execute();
+            return $stmt->fetchAll() ?: [];
+        } catch (Throwable) {
+            return [];
+        }
+    }
+
     /** @return array<int,array<string,mixed>> */
     private function obtenerCuotasOrdenadas(\PDO $db, int $socioId): array
     {
-        $stmt = $db->prepare("SELECT c.id,c.fecha_vencimiento,c.estado_cuota,c.monto_total,c.monto_pagado,c.saldo_pendiente,c.observacion,
+        $stmt = $db->prepare("SELECT c.id,c.periodo_id,c.fecha_vencimiento,c.estado_cuota,c.monto_total,c.monto_pagado,c.saldo_pendiente,c.observacion,
                 COALESCE(p.nombre_periodo, CONCAT('Plan #', c.periodo_id)) AS nombre_periodo,
                 COALESCE(p.tipo_periodo, 'mensual') AS tipo_periodo,
                 COALESCE(cc.nombre, 'Cuota') AS concepto,
@@ -282,15 +360,22 @@ class CuotasController extends Controller
         }
     }
 
-    private function crearCuotaDesdePlanActual(\PDO $db, int $socioId): int
+    private function crearCuotaDesdePlanActual(\PDO $db, int $socioId, ?int $periodoId = null): int
     {
-        $stmt = $db->prepare("SELECT sp.periodo_id, p.nombre_periodo, p.tipo_periodo, p.monto_a_pagar
+        $sql = "SELECT sp.periodo_id, p.nombre_periodo, p.tipo_periodo, p.monto_a_pagar
             FROM socio_planes sp
             INNER JOIN periodos p ON p.id = sp.periodo_id
-            WHERE sp.socio_id = :socio_id
-            ORDER BY sp.id DESC
-            LIMIT 1");
+            WHERE sp.socio_id = :socio_id";
+        if ($periodoId !== null && $periodoId > 0) {
+            $sql .= " AND sp.periodo_id = :periodo_id";
+        }
+        $sql .= " ORDER BY sp.id DESC LIMIT 1";
+
+        $stmt = $db->prepare($sql);
         $stmt->bindValue(':socio_id', $socioId, \PDO::PARAM_INT);
+        if ($periodoId !== null && $periodoId > 0) {
+            $stmt->bindValue(':periodo_id', $periodoId, \PDO::PARAM_INT);
+        }
         $stmt->execute();
         $plan = $stmt->fetch();
 
@@ -369,50 +454,55 @@ class CuotasController extends Controller
         return 'Mes ' . ($meses[$mesBase] ?? (string) $mesBase) . ' ' . $anioBase;
     }
 
-    private function obtenerCuotaActualDesdePlan(\PDO $db, int $socioId): ?array
+    /** @return array<int,array<string,mixed>> */
+    private function obtenerCuotasReferencialesDesdePlanes(\PDO $db, int $socioId): array
     {
         $stmt = $db->prepare("SELECT p.id AS periodo_id, p.nombre_periodo, p.tipo_periodo, p.monto_a_pagar
             FROM socio_planes sp
             INNER JOIN periodos p ON p.id = sp.periodo_id
             WHERE sp.socio_id = :socio_id
-            ORDER BY sp.id DESC
-            LIMIT 1");
+            ORDER BY sp.id DESC");
         $stmt->bindValue(':socio_id', $socioId, \PDO::PARAM_INT);
 
         try {
             $stmt->execute();
-            $plan = $stmt->fetch();
+            $planes = $stmt->fetchAll() ?: [];
         } catch (Throwable) {
-            return null;
+            return [];
         }
 
-        if (!$plan) {
-            return null;
+        if (empty($planes)) {
+            return [];
         }
 
-        $tipo = (string) ($plan['tipo_periodo'] ?? 'mensual');
-        $monto = (float) ($plan['monto_a_pagar'] ?? 0);
+        $cuotas = [];
+        foreach ($planes as $plan) {
+            $tipo = (string) ($plan['tipo_periodo'] ?? 'mensual');
+            $monto = (float) ($plan['monto_a_pagar'] ?? 0);
+            $periodoId = (int) ($plan['periodo_id'] ?? 0);
+            if ($periodoId <= 0) {
+                continue;
+            }
 
-        $fechaVencimiento = $this->obtenerFechaVencimientoProgresiva(
-            $db,
-            $socioId,
-            (int) ($plan['periodo_id'] ?? 0),
-            $tipo
-        );
+            $fechaVencimiento = $this->obtenerFechaVencimientoProgresiva($db, $socioId, $periodoId, $tipo);
 
-        return [
-            'id' => null,
-            'fecha_vencimiento' => $fechaVencimiento,
-            'estado_cuota' => 'pendiente',
-            'monto_total' => $monto,
-            'monto_pagado' => 0,
-            'saldo_pendiente' => $monto,
-            'observacion' => 'Cuota referencial del plan actual (aún no generada en cuotas).',
-            'nombre_periodo' => (string) ($plan['nombre_periodo'] ?? 'Plan actual'),
-            'tipo_periodo' => $tipo,
-            'concepto' => 'Cuota actual',
-            'es_referencia_plan' => 1,
-        ];
+            $cuotas[] = [
+                'id' => -$periodoId,
+                'periodo_id' => $periodoId,
+                'fecha_vencimiento' => $fechaVencimiento,
+                'estado_cuota' => 'pendiente',
+                'monto_total' => $monto,
+                'monto_pagado' => 0,
+                'saldo_pendiente' => $monto,
+                'observacion' => 'Cuota referencial del plan actual (aún no generada en cuotas).',
+                'nombre_periodo' => (string) ($plan['nombre_periodo'] ?? 'Plan actual'),
+                'tipo_periodo' => $tipo,
+                'concepto' => 'Cuota actual',
+                'es_referencia_plan' => 1,
+            ];
+        }
+
+        return $cuotas;
     }
 
     private function fechaVencimientoPeriodoActual(string $tipoPeriodo): string
@@ -442,22 +532,14 @@ class CuotasController extends Controller
             return $this->fechaVencimientoPeriodoActual($tipoPeriodo);
         }
 
-        $stmtSocio = $db->prepare('SELECT fecha_ingreso FROM socios WHERE id = :id LIMIT 1');
-        $stmtSocio->bindValue(':id', $socioId, \PDO::PARAM_INT);
-        $stmtSocio->execute();
-        $fechaIngreso = (string) ($stmtSocio->fetchColumn() ?: '');
-
-        $base = $fechaIngreso !== '' ? new \DateTimeImmutable($fechaIngreso) : new \DateTimeImmutable('today');
-        $base = $base->modify('first day of this month');
+        $base = new \DateTimeImmutable(date('Y-01-01'));
 
         $stmtCount = $db->prepare("SELECT COUNT(*)
             FROM cuotas
             WHERE socio_id = :socio_id
-              AND periodo_id = :periodo_id
               AND deleted_at IS NULL
               AND estado_cuota <> 'anulada'");
         $stmtCount->bindValue(':socio_id', $socioId, \PDO::PARAM_INT);
-        $stmtCount->bindValue(':periodo_id', $periodoId, \PDO::PARAM_INT);
         $stmtCount->execute();
         $cuotasRegistradas = (int) ($stmtCount->fetchColumn() ?: 0);
 

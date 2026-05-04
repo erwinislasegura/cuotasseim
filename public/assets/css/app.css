@@ -510,3 +510,9 @@ body {
 .landing-footer a:hover {
   text-decoration: underline;
 }
+
+.cuotas-table-compact td, .cuotas-table-compact th { padding-top: .22rem; padding-bottom: .22rem; font-size: .78rem; }
+
+.pagination .page-link { color: var(--ui-primary); border-color: var(--ui-border); }
+.pagination .page-item.active .page-link { background: var(--ui-primary); border-color: var(--ui-primary); color: #fff; }
+.pagination .page-link:hover { background: var(--ui-primary-soft); color: var(--ui-primary-strong); }
