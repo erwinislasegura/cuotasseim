@@ -19,6 +19,8 @@ class CuotasController extends Controller
 
         $q = trim((string) ($_GET['q'] ?? $_POST['q'] ?? ''));
         $selectedSocioId = max(0, (int) ($_GET['socio_id'] ?? $_POST['socio_id'] ?? 0));
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        $perPage = 50;
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $this->procesarRegistroPago($q, $selectedSocioId);
@@ -26,6 +28,8 @@ class CuotasController extends Controller
         }
 
         $socios = [];
+        $sociosTotal = 0;
+        $sociosPages = 1;
         $socio = null;
         $cuotaPorVencer = null;
         $otrasCuotas = [];
@@ -36,7 +40,10 @@ class CuotasController extends Controller
 
         try {
             $db = Database::connection();
-            $socios = $this->buscarSocios($db, $q);
+            $sociosData = $this->buscarSocios($db, $q, $page, $perPage);
+            $socios = $sociosData['items'];
+            $sociosTotal = $sociosData['total'];
+            $sociosPages = max(1, (int) ceil($sociosTotal / $perPage));
             $mediosPago = $this->obtenerMediosPago($db);
 
             if ($selectedSocioId <= 0 && $q !== '' && count($socios) === 1) {
@@ -99,6 +106,10 @@ class CuotasController extends Controller
             'q' => $q,
             'socios' => $socios,
             'selectedSocioId' => $selectedSocioId,
+            'page' => $page,
+            'sociosPages' => $sociosPages,
+            'perPage' => $perPage,
+            'sociosTotal' => $sociosTotal,
             'socio' => $socio,
             'cuotaPorVencer' => $cuotaPorVencer,
             'otrasCuotas' => $otrasCuotas,
@@ -150,13 +161,28 @@ class CuotasController extends Controller
         $this->redirect('/cuotas?q=' . urlencode($q) . '&socio_id=' . $socioId);
     }
 
-    /** @return array<int,array<string,mixed>> */
-    private function buscarSocios(\PDO $db, string $q): array
+    /** @return array{items: array<int,array<string,mixed>>, total:int} */
+    private function buscarSocios(\PDO $db, string $q, int $page, int $perPage): array
     {
+        $offset = max(0, ($page - 1) * $perPage);
+
         if ($q === '') {
-            $stmt = $db->query("SELECT id, numero_socio, nombre_completo, rut, correo, telefono FROM socios WHERE deleted_at IS NULL AND activo = 1 ORDER BY nombre_completo ASC LIMIT 30");
-            return $stmt->fetchAll();
+            $total = (int) ($db->query("SELECT COUNT(*) FROM socios WHERE deleted_at IS NULL AND activo = 1")->fetchColumn() ?: 0);
+            $stmt = $db->prepare("SELECT id, numero_socio, nombre_completo, rut, correo, telefono FROM socios WHERE deleted_at IS NULL AND activo = 1 ORDER BY nombre_completo ASC LIMIT :limit OFFSET :offset");
+            $stmt->bindValue(':limit', $perPage, \PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+            $stmt->execute();
+            return ['items' => $stmt->fetchAll() ?: [], 'total' => $total];
         }
+
+        $stmtCount = $db->prepare("SELECT COUNT(*)
+            FROM socios
+            WHERE deleted_at IS NULL
+              AND activo = 1
+              AND (nombre_completo LIKE :term OR rut LIKE :term OR CONCAT(COALESCE(nombres, ''), ' ', COALESCE(apellidos, '')) LIKE :term)");
+        $stmtCount->bindValue(':term', '%' . $q . '%');
+        $stmtCount->execute();
+        $total = (int) ($stmtCount->fetchColumn() ?: 0);
 
         $stmt = $db->prepare("SELECT id, numero_socio, nombre_completo, rut, correo, telefono
             FROM socios
@@ -164,11 +190,13 @@ class CuotasController extends Controller
               AND activo = 1
               AND (nombre_completo LIKE :term OR rut LIKE :term OR CONCAT(COALESCE(nombres, ''), ' ', COALESCE(apellidos, '')) LIKE :term)
             ORDER BY nombre_completo ASC
-            LIMIT 50");
+            LIMIT :limit OFFSET :offset");
         $stmt->bindValue(':term', '%' . $q . '%');
+        $stmt->bindValue(':limit', $perPage, \PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
         $stmt->execute();
 
-        return $stmt->fetchAll();
+        return ['items' => $stmt->fetchAll() ?: [], 'total' => $total];
     }
 
     /** @return array<int,array<string,mixed>> */

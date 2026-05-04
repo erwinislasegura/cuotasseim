@@ -55,7 +55,7 @@ $periodoAPagarLabel = static function (array $cuota): string {
       <div class="card-body py-2">
         <?php if (!empty($socios ?? [])): ?>
           <div class="table-responsive cuotas-socios-scroll">
-            <table class="table table-sm table-hover mb-0">
+            <table class="table table-sm table-hover mb-0 cuotas-table-compact">
               <thead>
                 <tr>
                   <th>N°</th>
@@ -81,6 +81,17 @@ $periodoAPagarLabel = static function (array $cuota): string {
               </tbody>
             </table>
           </div>
+          <?php if (($sociosPages ?? 1) > 1): ?>
+            <nav class="mt-2" aria-label="Paginación socios">
+              <ul class="pagination pagination-sm mb-0">
+                <?php for ($p = 1; $p <= (int) ($sociosPages ?? 1); $p++): ?>
+                  <li class="page-item <?= (int) ($page ?? 1) === $p ? 'active' : '' ?>">
+                    <a class="page-link" href="<?= htmlspecialchars(url('cuotas') . '?q=' . urlencode((string) ($q ?? '')) . '&socio_id=' . (int) ($selectedSocioId ?? 0) . '&page=' . $p) ?>"><?= $p ?></a>
+                  </li>
+                <?php endfor; ?>
+              </ul>
+            </nav>
+          <?php endif; ?>
         <?php else: ?>
           <p class="small text-muted mb-0">No hay socios para mostrar con la búsqueda actual.</p>
         <?php endif; ?>
@@ -111,7 +122,7 @@ $periodoAPagarLabel = static function (array $cuota): string {
             </div>
 
             <div class="mb-2">
-              <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#planesSocioModal">Ver planes asociados</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#planesSocioModal">Ver detalle de planes</button>
             </div>
 
             <?php if (!empty($sinPlanAsociado ?? false)): ?>
@@ -237,7 +248,7 @@ $periodoAPagarLabel = static function (array $cuota): string {
   <div class="modal-dialog modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Planes asociados del socio</h5>
+        <h5 class="modal-title">Detalle de planes del socio</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
       <div class="modal-body">
@@ -251,7 +262,7 @@ $periodoAPagarLabel = static function (array $cuota): string {
             <?php endforeach; ?>
           </ol>
         <?php else: ?>
-          <p class="text-muted mb-0">Este socio no tiene planes asociados.</p>
+          <p class="text-muted mb-0">Este socio no tiene planes configurados.</p>
         <?php endif; ?>
       </div>
     </div>
