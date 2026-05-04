@@ -46,8 +46,13 @@ $periodoAPagarLabel = static function (array $cuota): string {
     <div class="card h-100 cuotas-card-compact">
       <div class="card-header py-2 d-flex justify-content-between align-items-center gap-2 flex-wrap">
         <strong class="card-title mb-0">Socios</strong>
-        <form method="get" action="<?= htmlspecialchars(url('cuotas')) ?>" class="d-flex gap-2 flex-wrap cuotas-search-form js-socios-search-form">
-          <input type="text" id="q" name="q" class="form-control form-control-sm js-socios-search-input" value="<?= htmlspecialchars((string) ($q ?? '')) ?>" placeholder="Buscar por nombre o RUT" autocomplete="off">
+        <form method="get" action="<?= htmlspecialchars(url('cuotas')) ?>" class="d-flex gap-2 align-items-center cuotas-search-form">
+          <select name="search_type" class="form-select form-select-sm" style="max-width: 170px;">
+            <option value="nombre" <?= (($searchType ?? 'nombre') === 'nombre') ? 'selected' : '' ?>>Nombre</option>
+            <option value="rut" <?= (($searchType ?? 'nombre') === 'rut') ? 'selected' : '' ?>>RUT</option>
+            <option value="numero_socio" <?= (($searchType ?? 'nombre') === 'numero_socio') ? 'selected' : '' ?>>N° Socio</option>
+          </select>
+          <input type="text" id="q" name="q" class="form-control form-control-sm" style="min-width: 240px;" value="<?= htmlspecialchars((string) ($q ?? '')) ?>" placeholder="Ingresa término de búsqueda" autocomplete="off">
           <input type="hidden" name="page" value="1">
           <?php if (!empty($selectedSocioId ?? 0)): ?>
             <input type="hidden" name="socio_id" value="<?= (int) ($selectedSocioId ?? 0) ?>">
@@ -76,7 +81,7 @@ $periodoAPagarLabel = static function (array $cuota): string {
                     <td><?= htmlspecialchars((string) ($item['nombre_completo'] ?? '')) ?></td>
                     <td><?= htmlspecialchars((string) ($item['rut'] ?? '')) ?></td>
                     <td class="text-end">
-                      <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(url('cuotas') . '?q=' . urlencode((string) ($q ?? '')) . '&socio_id=' . (int) ($item['id'] ?? 0) . '&page=' . (int) ($page ?? 1)) ?>">
+                      <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(url('cuotas') . '?q=' . urlencode((string) ($q ?? '')) . '&search_type=' . urlencode((string) ($searchType ?? 'nombre')) . '&socio_id=' . (int) ($item['id'] ?? 0) . '&page=' . (int) ($page ?? 1)) ?>">
                         <?= $isCurrent ? 'Activo' : 'Elegir' ?>
                       </a>
                     </td>
@@ -91,7 +96,7 @@ $periodoAPagarLabel = static function (array $cuota): string {
               <ul class="pagination pagination-sm mb-0">
                 <?php for ($p = 1; $p <= (int) ($sociosPages ?? 1); $p++): ?>
                   <li class="page-item <?= (int) ($page ?? 1) === $p ? 'active' : '' ?>">
-                    <a class="page-link" href="<?= htmlspecialchars(url('cuotas') . '?q=' . urlencode((string) ($q ?? '')) . '&socio_id=' . (int) ($selectedSocioId ?? 0) . '&page=' . $p) ?>"><?= $p ?></a>
+                    <a class="page-link" href="<?= htmlspecialchars(url('cuotas') . '?q=' . urlencode((string) ($q ?? '')) . '&search_type=' . urlencode((string) ($searchType ?? 'nombre')) . '&socio_id=' . (int) ($selectedSocioId ?? 0) . '&page=' . $p) ?>"><?= $p ?></a>
                   </li>
                 <?php endfor; ?>
               </ul>
@@ -114,15 +119,9 @@ $periodoAPagarLabel = static function (array $cuota): string {
               <div><span>Socio</span><strong><?= htmlspecialchars((string) ($socio['nombre_completo'] ?? '')) ?></strong></div>
               <div><span>RUT</span><strong><?= htmlspecialchars((string) ($socio['rut'] ?? '')) ?></strong></div>
               <div><span>N° Socio</span><strong><?= htmlspecialchars((string) ($socio['numero_socio'] ?? '-')) ?></strong></div>
-              <?php
-                $planesSocioNombres = array_values(array_filter(array_map(static fn(array $plan): string => trim((string) ($plan['nombre_periodo'] ?? '')), (array) ($planesSocio ?? []))));
-                $planesSocioTexto = !empty($planesSocioNombres) ? implode(', ', $planesSocioNombres) : '-';
-              ?>
-              <div><span>Planes asociados</span><strong><?= htmlspecialchars($planesSocioTexto) ?></strong></div>
               <?php if (!empty($cuotaPorVencer)): ?>
                 <div><span>Plan</span><strong><?= htmlspecialchars((string) ($cuotaPorVencer['nombre_periodo'] ?? '-')) ?></strong></div>
                 <div><span>Periodo</span><strong><?= htmlspecialchars($periodoAPagarLabel($cuotaPorVencer)) ?></strong></div>
-                <div><span>Saldo pendiente</span><strong><?= htmlspecialchars(money((float) ($cuotaPorVencer['saldo_pendiente'] ?? 0))) ?></strong></div>
               <?php endif; ?>
             </div>
 
@@ -250,24 +249,34 @@ $periodoAPagarLabel = static function (array $cuota): string {
 
 
 <div class="modal fade" id="planesSocioModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-scrollable">
+  <div class="modal-dialog modal-dialog-scrollable modal-sm">
     <div class="modal-content">
-      <div class="modal-header">
+      <div class="modal-header py-2">
         <h5 class="modal-title">Detalle de planes del socio</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
-      <div class="modal-body">
+      <div class="modal-body py-2">
         <?php if (!empty($planesSocio ?? [])): ?>
-          <ol class="mb-0 ps-3">
-            <?php foreach ((array) $planesSocio as $planItem): ?>
-              <li class="mb-2">
-                <strong><?= htmlspecialchars((string) ($planItem['nombre_periodo'] ?? 'Plan')) ?></strong><br>
-                <small class="text-muted">Tipo: <?= htmlspecialchars((string) ($planItem['tipo_periodo'] ?? '-')) ?></small>
-              </li>
-            <?php endforeach; ?>
-          </ol>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Plan</th>
+                  <th class="text-end">Tipo</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ((array) $planesSocio as $planItem): ?>
+                  <tr>
+                    <td class="small"><?= htmlspecialchars((string) ($planItem['nombre_periodo'] ?? 'Plan')) ?></td>
+                    <td class="text-end"><span class="badge text-bg-light border"><?= htmlspecialchars((string) ($planItem['tipo_periodo'] ?? '-')) ?></span></td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
         <?php else: ?>
-          <p class="text-muted mb-0">Este socio no tiene planes configurados.</p>
+          <p class="text-muted small mb-0">Este socio no tiene planes configurados.</p>
         <?php endif; ?>
       </div>
     </div>
