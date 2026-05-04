@@ -736,6 +736,8 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
                       }
                       ?>
                       <span class="badge badge-status <?= htmlspecialchars(status_badge_class($normalized)) ?>"><?= htmlspecialchars(status_label($normalized)) ?></span>
+                    <?php elseif (($route ?? '') === 'periodos' && in_array((string) $column, ['monto', 'monto_a_pagar'], true)): ?>
+                      <?= htmlspecialchars(money((float) ($row[$column] ?? 0))) ?>
                     <?php else: ?>
                       <?= htmlspecialchars($cellValue) ?>
                     <?php endif; ?>
