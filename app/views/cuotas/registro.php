@@ -46,8 +46,13 @@ $periodoAPagarLabel = static function (array $cuota): string {
     <div class="card h-100 cuotas-card-compact">
       <div class="card-header py-2 d-flex justify-content-between align-items-center gap-2 flex-wrap">
         <strong class="card-title mb-0">Socios</strong>
-        <form method="get" action="<?= htmlspecialchars(url('cuotas')) ?>" class="d-flex gap-2 flex-wrap cuotas-search-form js-socios-search-form">
-          <input type="text" id="q" name="q" class="form-control form-control-sm js-socios-search-input" value="<?= htmlspecialchars((string) ($q ?? '')) ?>" placeholder="Buscar por nombre o RUT" autocomplete="off">
+        <form method="get" action="<?= htmlspecialchars(url('cuotas')) ?>" class="d-flex gap-2 align-items-center cuotas-search-form">
+          <select name="search_type" class="form-select form-select-sm" style="max-width: 170px;">
+            <option value="nombre" <?= (($searchType ?? 'nombre') === 'nombre') ? 'selected' : '' ?>>Nombre</option>
+            <option value="rut" <?= (($searchType ?? 'nombre') === 'rut') ? 'selected' : '' ?>>RUT</option>
+            <option value="numero_socio" <?= (($searchType ?? 'nombre') === 'numero_socio') ? 'selected' : '' ?>>N° Socio</option>
+          </select>
+          <input type="text" id="q" name="q" class="form-control form-control-sm" style="min-width: 240px;" value="<?= htmlspecialchars((string) ($q ?? '')) ?>" placeholder="Ingresa término de búsqueda" autocomplete="off">
           <input type="hidden" name="page" value="1">
           <?php if (!empty($selectedSocioId ?? 0)): ?>
             <input type="hidden" name="socio_id" value="<?= (int) ($selectedSocioId ?? 0) ?>">
@@ -76,7 +81,7 @@ $periodoAPagarLabel = static function (array $cuota): string {
                     <td><?= htmlspecialchars((string) ($item['nombre_completo'] ?? '')) ?></td>
                     <td><?= htmlspecialchars((string) ($item['rut'] ?? '')) ?></td>
                     <td class="text-end">
-                      <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(url('cuotas') . '?q=' . urlencode((string) ($q ?? '')) . '&socio_id=' . (int) ($item['id'] ?? 0) . '&page=' . (int) ($page ?? 1)) ?>">
+                      <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(url('cuotas') . '?q=' . urlencode((string) ($q ?? '')) . '&search_type=' . urlencode((string) ($searchType ?? 'nombre')) . '&socio_id=' . (int) ($item['id'] ?? 0) . '&page=' . (int) ($page ?? 1)) ?>">
                         <?= $isCurrent ? 'Activo' : 'Elegir' ?>
                       </a>
                     </td>
@@ -91,7 +96,7 @@ $periodoAPagarLabel = static function (array $cuota): string {
               <ul class="pagination pagination-sm mb-0">
                 <?php for ($p = 1; $p <= (int) ($sociosPages ?? 1); $p++): ?>
                   <li class="page-item <?= (int) ($page ?? 1) === $p ? 'active' : '' ?>">
-                    <a class="page-link" href="<?= htmlspecialchars(url('cuotas') . '?q=' . urlencode((string) ($q ?? '')) . '&socio_id=' . (int) ($selectedSocioId ?? 0) . '&page=' . $p) ?>"><?= $p ?></a>
+                    <a class="page-link" href="<?= htmlspecialchars(url('cuotas') . '?q=' . urlencode((string) ($q ?? '')) . '&search_type=' . urlencode((string) ($searchType ?? 'nombre')) . '&socio_id=' . (int) ($selectedSocioId ?? 0) . '&page=' . $p) ?>"><?= $p ?></a>
                   </li>
                 <?php endfor; ?>
               </ul>
