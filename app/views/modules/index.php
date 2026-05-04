@@ -705,6 +705,15 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
         <button class="btn btn-outline-secondary btn-sm" type="submit">Filtrar</button>
         <a class="btn btn-light btn-sm" href="<?= htmlspecialchars(url($route ?? '')) ?>">Limpiar</a>
       </div>
+      <?php if (($route ?? '') === 'socios' && !($isReadOnly ?? false)): ?>
+        <div class="col-sm-auto d-flex align-items-end">
+          <form method="post" action="<?= htmlspecialchars(url($route ?? '')) ?>" onsubmit="return confirm('¿Asociar TODOS los planes a TODOS los socios? Esta acción reemplaza asociaciones existentes.');">
+            <input type="hidden" name="_token" value="<?= htmlspecialchars($token ?? '') ?>">
+            <input type="hidden" name="_action" value="associate_all_plans">
+            <button class="btn btn-warning btn-sm" type="submit">Asociar todos los planes a todos los socios</button>
+          </form>
+        </div>
+      <?php endif; ?>
     </form>
   </div>
   <div class="card-body p-0">
@@ -743,6 +752,8 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
                       }
                       ?>
                       <span class="badge badge-status <?= htmlspecialchars(status_badge_class($normalized)) ?>"><?= htmlspecialchars(status_label($normalized)) ?></span>
+                    <?php elseif (($route ?? '') === 'periodos' && in_array((string) $column, ['monto', 'monto_a_pagar'], true)): ?>
+                      <?= htmlspecialchars(money((float) ($row[$column] ?? 0))) ?>
                     <?php else: ?>
                       <?= htmlspecialchars($cellValue) ?>
                     <?php endif; ?>
