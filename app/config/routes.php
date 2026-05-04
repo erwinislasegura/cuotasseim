@@ -23,6 +23,7 @@ return [
     ['POST', '/periodos', 'PeriodosController@index'],
 
     ['GET', '/cuotas', 'CuotasController@index'],
+    ['GET', '/deudas', 'DeudasController@index'],
     ['POST', '/cuotas', 'CuotasController@index'],
     ['GET', '/pagos', 'PagosController@index'],
     ['POST', '/pagos', 'PagosController@index'],
