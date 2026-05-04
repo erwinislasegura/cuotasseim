@@ -105,6 +105,10 @@ $periodoAPagarLabel = static function (array $cuota): string {
               <?php endif; ?>
             </div>
 
+            <div class="mb-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#planesSocioModal">Ver planes asociados</button>
+            </div>
+
             <?php if (!empty($sinPlanAsociado ?? false)): ?>
               <div class="alert alert-warning small mb-2">
                 Este socio no tiene un plan asociado. Debes asociarle un plan para registrar el pago de cuota.
@@ -125,9 +129,7 @@ $periodoAPagarLabel = static function (array $cuota): string {
                   }
                   if (!empty($otrasCuotas ?? [])) {
                     foreach ($otrasCuotas as $cuotaPendiente) {
-                      if ((int) ($cuotaPendiente['id'] ?? 0) > 0) {
-                        $cuotasSeleccionables[] = $cuotaPendiente;
-                      }
+                      $cuotasSeleccionables[] = $cuotaPendiente;
                     }
                   }
                 ?>
@@ -220,6 +222,32 @@ $periodoAPagarLabel = static function (array $cuota): string {
             <p class="small text-muted mb-0">Selecciona un socio para habilitar el registro de pago.</p>
           <?php endif; ?>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<div class="modal fade" id="planesSocioModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Planes asociados del socio</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <?php if (!empty($planesSocio ?? [])): ?>
+          <ol class="mb-0 ps-3">
+            <?php foreach ((array) $planesSocio as $planItem): ?>
+              <li class="mb-2">
+                <strong><?= htmlspecialchars((string) ($planItem['nombre_periodo'] ?? 'Plan')) ?></strong><br>
+                <small class="text-muted">Tipo: <?= htmlspecialchars((string) ($planItem['tipo_periodo'] ?? '-')) ?></small>
+              </li>
+            <?php endforeach; ?>
+          </ol>
+        <?php else: ?>
+          <p class="text-muted mb-0">Este socio no tiene planes asociados.</p>
+        <?php endif; ?>
       </div>
     </div>
   </div>
