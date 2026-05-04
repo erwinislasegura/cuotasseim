@@ -122,7 +122,6 @@ $periodoAPagarLabel = static function (array $cuota): string {
               <?php if (!empty($cuotaPorVencer)): ?>
                 <div><span>Plan</span><strong><?= htmlspecialchars((string) ($cuotaPorVencer['nombre_periodo'] ?? '-')) ?></strong></div>
                 <div><span>Periodo</span><strong><?= htmlspecialchars($periodoAPagarLabel($cuotaPorVencer)) ?></strong></div>
-                <div><span>Saldo pendiente</span><strong><?= htmlspecialchars(money((float) ($cuotaPorVencer['saldo_pendiente'] ?? 0))) ?></strong></div>
               <?php endif; ?>
             </div>
 
@@ -250,24 +249,34 @@ $periodoAPagarLabel = static function (array $cuota): string {
 
 
 <div class="modal fade" id="planesSocioModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-scrollable">
+  <div class="modal-dialog modal-dialog-scrollable modal-sm">
     <div class="modal-content">
-      <div class="modal-header">
+      <div class="modal-header py-2">
         <h5 class="modal-title">Detalle de planes del socio</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
-      <div class="modal-body">
+      <div class="modal-body py-2">
         <?php if (!empty($planesSocio ?? [])): ?>
-          <ol class="mb-0 ps-3">
-            <?php foreach ((array) $planesSocio as $planItem): ?>
-              <li class="mb-2">
-                <strong><?= htmlspecialchars((string) ($planItem['nombre_periodo'] ?? 'Plan')) ?></strong><br>
-                <small class="text-muted">Tipo: <?= htmlspecialchars((string) ($planItem['tipo_periodo'] ?? '-')) ?></small>
-              </li>
-            <?php endforeach; ?>
-          </ol>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Plan</th>
+                  <th class="text-end">Tipo</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ((array) $planesSocio as $planItem): ?>
+                  <tr>
+                    <td class="small"><?= htmlspecialchars((string) ($planItem['nombre_periodo'] ?? 'Plan')) ?></td>
+                    <td class="text-end"><span class="badge text-bg-light border"><?= htmlspecialchars((string) ($planItem['tipo_periodo'] ?? '-')) ?></span></td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
         <?php else: ?>
-          <p class="text-muted mb-0">Este socio no tiene planes configurados.</p>
+          <p class="text-muted small mb-0">Este socio no tiene planes configurados.</p>
         <?php endif; ?>
       </div>
     </div>
