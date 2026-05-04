@@ -119,10 +119,6 @@ $periodoAPagarLabel = static function (array $cuota): string {
               <div><span>Socio</span><strong><?= htmlspecialchars((string) ($socio['nombre_completo'] ?? '')) ?></strong></div>
               <div><span>RUT</span><strong><?= htmlspecialchars((string) ($socio['rut'] ?? '')) ?></strong></div>
               <div><span>N° Socio</span><strong><?= htmlspecialchars((string) ($socio['numero_socio'] ?? '-')) ?></strong></div>
-              <?php if (!empty($cuotaPorVencer)): ?>
-                <div><span>Plan</span><strong><?= htmlspecialchars((string) ($cuotaPorVencer['nombre_periodo'] ?? '-')) ?></strong></div>
-                <div><span>Periodo</span><strong><?= htmlspecialchars($periodoAPagarLabel($cuotaPorVencer)) ?></strong></div>
-              <?php endif; ?>
             </div>
 
             <div class="mb-2">
