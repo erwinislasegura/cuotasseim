@@ -18,6 +18,10 @@ class CuotasController extends Controller
         Session::start();
 
         $q = trim((string) ($_GET['q'] ?? $_POST['q'] ?? ''));
+        $searchType = (string) ($_GET['search_type'] ?? $_POST['search_type'] ?? 'nombre');
+        if (!in_array($searchType, ['nombre', 'rut', 'numero_socio'], true)) {
+            $searchType = 'nombre';
+        }
         $selectedSocioId = max(0, (int) ($_GET['socio_id'] ?? $_POST['socio_id'] ?? 0));
         $page = max(1, (int) ($_GET['page'] ?? 1));
         $perPage = 50;
@@ -40,13 +44,13 @@ class CuotasController extends Controller
 
         try {
             $db = Database::connection();
-            $sociosData = $this->buscarSocios($db, $q, $page, $perPage);
+            $sociosData = $this->buscarSocios($db, $q, $searchType, $page, $perPage);
             $socios = $sociosData['items'];
             $sociosTotal = $sociosData['total'];
             $sociosPages = max(1, (int) ceil($sociosTotal / $perPage));
             if ($page > $sociosPages) {
                 $page = $sociosPages;
-                $sociosData = $this->buscarSocios($db, $q, $page, $perPage);
+                $sociosData = $this->buscarSocios($db, $q, $searchType, $page, $perPage);
                 $socios = $sociosData['items'];
             }
             $mediosPago = $this->obtenerMediosPago($db);
@@ -109,6 +113,7 @@ class CuotasController extends Controller
             'title' => 'Registro de cuotas',
             'description' => 'Busca al socio por nombre o RUT, revisa la cuota actual y registra su pago.',
             'q' => $q,
+            'searchType' => $searchType,
             'socios' => $socios,
             'selectedSocioId' => $selectedSocioId,
             'page' => $page,
@@ -167,7 +172,7 @@ class CuotasController extends Controller
     }
 
     /** @return array{items: array<int,array<string,mixed>>, total:int} */
-    private function buscarSocios(\PDO $db, string $q, int $page, int $perPage): array
+    private function buscarSocios(\PDO $db, string $q, string $searchType, int $page, int $perPage): array
     {
         $offset = max(0, ($page - 1) * $perPage);
 
@@ -178,12 +183,21 @@ class CuotasController extends Controller
             return ['items' => $stmt->fetchAll() ?: [], 'total' => $total];
         }
 
+        $filterSql = 'nombre_completo LIKE :term';
+        $term = '%' . $q . '%';
+
+        if ($searchType === 'rut') {
+            $filterSql = 'rut LIKE :term';
+        } elseif ($searchType === 'numero_socio') {
+            $filterSql = 'CAST(numero_socio AS CHAR) LIKE :term';
+        }
+
         $stmtCount = $db->prepare("SELECT COUNT(*)
             FROM socios
             WHERE deleted_at IS NULL
               AND activo = 1
-              AND (nombre_completo LIKE :term OR rut LIKE :term)");
-        $stmtCount->bindValue(':term', '%' . $q . '%');
+              AND {$filterSql}");
+        $stmtCount->bindValue(':term', $term);
         $stmtCount->execute();
         $total = (int) ($stmtCount->fetchColumn() ?: 0);
 
@@ -191,10 +205,10 @@ class CuotasController extends Controller
             FROM socios
             WHERE deleted_at IS NULL
               AND activo = 1
-              AND (nombre_completo LIKE :term OR rut LIKE :term)
+              AND {$filterSql}
             ORDER BY nombre_completo ASC
             LIMIT {$perPage} OFFSET {$offset}");
-        $stmt->bindValue(':term', '%' . $q . '%');
+        $stmt->bindValue(':term', $term);
         $stmt->execute();
 
         return ['items' => $stmt->fetchAll() ?: [], 'total' => $total];
