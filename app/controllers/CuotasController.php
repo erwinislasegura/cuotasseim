@@ -542,17 +542,6 @@ class CuotasController extends Controller
             return $this->fechaVencimientoPeriodoActual($tipoPeriodo);
         }
 
-        $base = new \DateTimeImmutable(date('Y-01-01'));
-
-        $stmtCount = $db->prepare("SELECT COUNT(*)
-            FROM cuotas
-            WHERE socio_id = :socio_id
-              AND deleted_at IS NULL
-              AND estado_cuota <> 'anulada'");
-        $stmtCount->bindValue(':socio_id', $socioId, \PDO::PARAM_INT);
-        $stmtCount->execute();
-        $cuotasRegistradas = (int) ($stmtCount->fetchColumn() ?: 0);
-
         $saltoMeses = 1;
         if ($tipoPeriodo === 'trimestral') {
             $saltoMeses = 3;
@@ -562,10 +551,34 @@ class CuotasController extends Controller
             $saltoMeses = 12;
         }
 
-        $inicioPeriodo = $base->modify('+' . ($cuotasRegistradas * $saltoMeses) . ' months');
-        $finPeriodo = $inicioPeriodo->modify('+' . ($saltoMeses - 1) . ' months')->modify('last day of this month');
+        $stmtUltimaCuota = $db->prepare("SELECT fecha_vencimiento
+            FROM cuotas
+            WHERE socio_id = :socio_id
+              AND periodo_id = :periodo_id
+              AND deleted_at IS NULL
+              AND estado_cuota <> 'anulada'
+            ORDER BY fecha_vencimiento DESC, id DESC
+            LIMIT 1");
+        $stmtUltimaCuota->bindValue(':socio_id', $socioId, \PDO::PARAM_INT);
+        $stmtUltimaCuota->bindValue(':periodo_id', $periodoId, \PDO::PARAM_INT);
+        $stmtUltimaCuota->execute();
+        $ultimaFecha = (string) ($stmtUltimaCuota->fetchColumn() ?: '');
 
-        return $finPeriodo->format('Y-m-d');
+        if ($ultimaFecha !== '') {
+            $base = new \DateTimeImmutable($ultimaFecha);
+            return $base->modify('+' . $saltoMeses . ' months')->modify('last day of this month')->format('Y-m-d');
+        }
+
+        $stmtSocio = $db->prepare("SELECT fecha_ingreso FROM socios WHERE id = :socio_id LIMIT 1");
+        $stmtSocio->bindValue(':socio_id', $socioId, \PDO::PARAM_INT);
+        $stmtSocio->execute();
+        $fechaIngreso = trim((string) ($stmtSocio->fetchColumn() ?: ''));
+
+        if ($fechaIngreso === '') {
+            return $this->fechaVencimientoPeriodoActual($tipoPeriodo);
+        }
+
+        return (new \DateTimeImmutable($fechaIngreso))->modify('+' . ($saltoMeses - 1) . ' months')->modify('last day of this month')->format('Y-m-d');
     }
 
     public function crear(): void
