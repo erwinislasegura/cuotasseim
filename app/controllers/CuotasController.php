@@ -184,7 +184,7 @@ class CuotasController extends Controller
             FROM socios
             WHERE deleted_at IS NULL
               AND activo = 1
-              AND (nombre_completo LIKE :term OR rut LIKE :term OR CONCAT(COALESCE(nombres, ''), ' ', COALESCE(apellidos, '')) LIKE :term)");
+              AND (nombre_completo LIKE :term OR rut LIKE :term)");
         $stmtCount->bindValue(':term', '%' . $q . '%');
         $stmtCount->execute();
         $total = (int) ($stmtCount->fetchColumn() ?: 0);
@@ -193,7 +193,7 @@ class CuotasController extends Controller
             FROM socios
             WHERE deleted_at IS NULL
               AND activo = 1
-              AND (nombre_completo LIKE :term OR rut LIKE :term OR CONCAT(COALESCE(nombres, ''), ' ', COALESCE(apellidos, '')) LIKE :term)
+              AND (nombre_completo LIKE :term OR rut LIKE :term)
             ORDER BY nombre_completo ASC
             LIMIT :limit OFFSET :offset");
         $stmt->bindValue(':term', '%' . $q . '%');
