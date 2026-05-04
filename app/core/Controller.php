@@ -429,38 +429,6 @@ abstract class Controller
                 }
 
 
-                if (!$isReadOnly && $action === 'associate_all_plans' && ($config['table'] ?? '') === 'socios') {
-                    $planIds = [];
-                    if (ModuleCatalog::tableExists('periodos')) {
-                        $planStmt = Database::connection()->query('SELECT id FROM periodos ORDER BY id ASC');
-                        $planIds = array_values(array_unique(array_map(static fn($item): int => (int) ($item['id'] ?? 0), $planStmt->fetchAll())));
-                        $planIds = array_values(array_filter($planIds, static fn(int $value): bool => $value > 0));
-                    }
-
-                    if (empty($planIds)) {
-                        $_SESSION['flash_error'] = 'No hay planes disponibles para asociar.';
-                    } elseif (!ModuleCatalog::tableExists('socio_planes')) {
-                        $_SESSION['flash_error'] = 'No existe la tabla socio_planes para guardar asociaciones.';
-                    } else {
-                        $sociosSql = ModuleCatalog::columnExists('socios', 'deleted_at')
-                            ? 'SELECT id FROM socios WHERE deleted_at IS NULL ORDER BY id ASC'
-                            : 'SELECT id FROM socios ORDER BY id ASC';
-                        $sociosStmt = Database::connection()->query($sociosSql);
-                        $sociosIds = array_values(array_unique(array_map(static fn($item): int => (int) ($item['id'] ?? 0), $sociosStmt->fetchAll())));
-                        $sociosIds = array_values(array_filter($sociosIds, static fn(int $value): bool => $value > 0));
-
-                        if (empty($sociosIds)) {
-                            $_SESSION['flash_error'] = 'No se encontraron socios para asociar planes.';
-                        } else {
-                            $processed = 0;
-                            foreach ($sociosIds as $socioId) {
-                                ModuleCatalog::syncSocioPlanes($socioId, $planIds);
-                                $processed++;
-                            }
-                            $_SESSION['flash_success'] = 'Se asociaron todos los planes a ' . $processed . ' socios.';
-                        }
-                    }
-                }
 
                 if (!$isReadOnly && $action === 'delete' && $id !== null && $id > 0) {
                     $deletedRecord = ModuleCatalog::findById($config['table'], $primaryKey, $id);

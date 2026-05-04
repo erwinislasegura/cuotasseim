@@ -109,6 +109,11 @@ $periodoAPagarLabel = static function (array $cuota): string {
               <div><span>Socio</span><strong><?= htmlspecialchars((string) ($socio['nombre_completo'] ?? '')) ?></strong></div>
               <div><span>RUT</span><strong><?= htmlspecialchars((string) ($socio['rut'] ?? '')) ?></strong></div>
               <div><span>N° Socio</span><strong><?= htmlspecialchars((string) ($socio['numero_socio'] ?? '-')) ?></strong></div>
+              <?php
+                $planesSocioNombres = array_values(array_filter(array_map(static fn(array $plan): string => trim((string) ($plan['nombre_periodo'] ?? '')), (array) ($planesSocio ?? []))));
+                $planesSocioTexto = !empty($planesSocioNombres) ? implode(', ', $planesSocioNombres) : '-';
+              ?>
+              <div><span>Planes asociados</span><strong><?= htmlspecialchars($planesSocioTexto) ?></strong></div>
               <?php if (!empty($cuotaPorVencer)): ?>
                 <div><span>Plan</span><strong><?= htmlspecialchars((string) ($cuotaPorVencer['nombre_periodo'] ?? '-')) ?></strong></div>
                 <div><span>Periodo</span><strong><?= htmlspecialchars($periodoAPagarLabel($cuotaPorVencer)) ?></strong></div>
