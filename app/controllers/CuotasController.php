@@ -31,6 +31,7 @@ class CuotasController extends Controller
         $otrasCuotas = [];
         $mediosPago = [];
         $sinPlanAsociado = false;
+        $planesSocio = [];
         $error = null;
 
         try {
@@ -46,6 +47,7 @@ class CuotasController extends Controller
                 $socio = $this->obtenerSocio($db, $selectedSocioId);
 
                 if ($socio !== null) {
+                    $planesSocio = $this->obtenerPlanesSocio($db, $selectedSocioId);
                     $cuotas = $this->obtenerCuotasOrdenadas($db, $selectedSocioId);
                     $cuotasPendientes = array_values(array_filter(
                         $cuotas,
@@ -80,6 +82,7 @@ class CuotasController extends Controller
             'otrasCuotas' => $otrasCuotas,
             'mediosPago' => $mediosPago,
             'sinPlanAsociado' => $sinPlanAsociado,
+            'planesSocio' => $planesSocio,
             'token' => Csrf::token(),
             'flashSuccess' => $flashSuccess,
             'flashError' => $flashError,
@@ -160,6 +163,25 @@ class CuotasController extends Controller
 
         $row = $stmtSocio->fetch();
         return $row ?: null;
+    }
+
+
+    /** @return array<int,array<string,mixed>> */
+    private function obtenerPlanesSocio(\PDO $db, int $socioId): array
+    {
+        $stmt = $db->prepare("SELECT p.id, p.nombre_periodo, p.tipo_periodo
+            FROM socio_planes sp
+            INNER JOIN periodos p ON p.id = sp.periodo_id
+            WHERE sp.socio_id = :socio_id
+            ORDER BY sp.id DESC");
+        $stmt->bindValue(':socio_id', $socioId, \PDO::PARAM_INT);
+
+        try {
+            $stmt->execute();
+            return $stmt->fetchAll() ?: [];
+        } catch (Throwable) {
+            return [];
+        }
     }
 
     /** @return array<int,array<string,mixed>> */
