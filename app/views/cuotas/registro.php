@@ -72,7 +72,7 @@ $periodoAPagarLabel = static function (array $cuota): string {
                     <td><?= htmlspecialchars((string) ($item['nombre_completo'] ?? '')) ?></td>
                     <td><?= htmlspecialchars((string) ($item['rut'] ?? '')) ?></td>
                     <td class="text-end">
-                      <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(url('cuotas') . '?q=' . urlencode((string) ($q ?? '')) . '&socio_id=' . (int) ($item['id'] ?? 0)) ?>">
+                      <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(url('cuotas') . '?q=' . urlencode((string) ($q ?? '')) . '&socio_id=' . (int) ($item['id'] ?? 0) . '&page=' . (int) ($page ?? 1)) ?>">
                         <?= $isCurrent ? 'Activo' : 'Elegir' ?>
                       </a>
                     </td>
@@ -81,6 +81,7 @@ $periodoAPagarLabel = static function (array $cuota): string {
               </tbody>
             </table>
           </div>
+          <div class="small text-muted mt-2">Mostrando hasta <?= (int) ($perPage ?? 50) ?> registros por página · Total: <?= (int) ($sociosTotal ?? 0) ?></div>
           <?php if (($sociosPages ?? 1) > 1): ?>
             <nav class="mt-2" aria-label="Paginación socios">
               <ul class="pagination pagination-sm mb-0">

@@ -44,6 +44,11 @@ class CuotasController extends Controller
             $socios = $sociosData['items'];
             $sociosTotal = $sociosData['total'];
             $sociosPages = max(1, (int) ceil($sociosTotal / $perPage));
+            if ($page > $sociosPages) {
+                $page = $sociosPages;
+                $sociosData = $this->buscarSocios($db, $q, $page, $perPage);
+                $socios = $sociosData['items'];
+            }
             $mediosPago = $this->obtenerMediosPago($db);
 
             if ($selectedSocioId <= 0 && $q !== '' && count($socios) === 1) {
