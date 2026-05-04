@@ -632,10 +632,21 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
       </form>
     <?php endif; ?>
     <form method="get" action="<?= htmlspecialchars(url($route ?? '')) ?>" class="row gx-2 gy-2 align-items-end <?= ($route ?? '') === 'reportes' ? 'report-filters' : '' ?>">
-      <div class="col-sm-auto filter-search">
-        <label class="form-label">Buscar</label>
-        <input type="text" name="q" value="<?= htmlspecialchars($query ?? '') ?>" class="form-control form-control-sm" placeholder="Buscar...">
-      </div>
+      <?php if (($route ?? '') === 'pagos'): ?>
+        <div class="col-sm-auto filter-search">
+          <label class="form-label">Nombre socio</label>
+          <input type="text" name="q_nombre" value="<?= htmlspecialchars((string) ($extraFilters['q_nombre'] ?? '')) ?>" class="form-control form-control-sm" placeholder="Buscar por nombre...">
+        </div>
+        <div class="col-sm-auto filter-search">
+          <label class="form-label">RUT socio</label>
+          <input type="text" name="q_rut" value="<?= htmlspecialchars((string) ($extraFilters['q_rut'] ?? '')) ?>" class="form-control form-control-sm" placeholder="Buscar por RUT...">
+        </div>
+      <?php else: ?>
+        <div class="col-sm-auto filter-search">
+          <label class="form-label">Buscar</label>
+          <input type="text" name="q" value="<?= htmlspecialchars($query ?? '') ?>" class="form-control form-control-sm" placeholder="Buscar...">
+        </div>
+      <?php endif; ?>
       <div class="col-sm-auto filter-status">
         <label class="form-label">Estado</label>
         <select name="status" class="form-select form-select-sm">
