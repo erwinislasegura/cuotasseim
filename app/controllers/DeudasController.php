@@ -25,7 +25,7 @@ class DeudasController extends Controller
             $db = Database::connection();
             $stmt = $db->query("SELECT c.id, c.fecha_vencimiento, c.estado_cuota, c.monto, c.saldo_pendiente,
                     s.numero_socio, s.nombre_completo, s.rut,
-                    p.nombre AS nombre_periodo
+                    p.nombre_periodo
                 FROM cuotas c
                 INNER JOIN socios s ON s.id = c.socio_id
                 LEFT JOIN periodos p ON p.id = c.periodo_id
