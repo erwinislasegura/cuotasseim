@@ -46,13 +46,13 @@ $periodoAPagarLabel = static function (array $cuota): string {
     <div class="card h-100 cuotas-card-compact">
       <div class="card-header py-2 d-flex justify-content-between align-items-center gap-2 flex-wrap">
         <strong class="card-title mb-0">Socios</strong>
-        <form method="get" action="<?= htmlspecialchars(url('cuotas')) ?>" class="d-flex gap-2 flex-wrap cuotas-search-form">
+        <form method="get" action="<?= htmlspecialchars(url('cuotas')) ?>" class="d-flex gap-2 align-items-center cuotas-search-form">
           <select name="search_type" class="form-select form-select-sm" style="max-width: 170px;">
             <option value="nombre" <?= (($searchType ?? 'nombre') === 'nombre') ? 'selected' : '' ?>>Nombre</option>
             <option value="rut" <?= (($searchType ?? 'nombre') === 'rut') ? 'selected' : '' ?>>RUT</option>
             <option value="numero_socio" <?= (($searchType ?? 'nombre') === 'numero_socio') ? 'selected' : '' ?>>N° Socio</option>
           </select>
-          <input type="text" id="q" name="q" class="form-control form-control-sm" value="<?= htmlspecialchars((string) ($q ?? '')) ?>" placeholder="Ingresa término de búsqueda" autocomplete="off">
+          <input type="text" id="q" name="q" class="form-control form-control-sm" style="min-width: 240px;" value="<?= htmlspecialchars((string) ($q ?? '')) ?>" placeholder="Ingresa término de búsqueda" autocomplete="off">
           <input type="hidden" name="page" value="1">
           <?php if (!empty($selectedSocioId ?? 0)): ?>
             <input type="hidden" name="socio_id" value="<?= (int) ($selectedSocioId ?? 0) ?>">
