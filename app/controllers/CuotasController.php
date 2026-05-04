@@ -195,6 +195,8 @@ class CuotasController extends Controller
             ORDER BY nombre_completo ASC
             LIMIT {$perPage} OFFSET {$offset}");
         $stmt->bindValue(':term', '%' . $q . '%');
+        $stmt->bindValue(':limit', $perPage, \PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
         $stmt->execute();
 
         return ['items' => $stmt->fetchAll() ?: [], 'total' => $total];
