@@ -537,7 +537,7 @@ class ModuleCatalog
         return array_map(static fn(array $row): string => (string) ($row['periodo_id'] ?? ''), $stmt->fetchAll());
     }
 
-    private static function syncSocioPlanes(int $socioId, array $planIds): void
+    public static function syncSocioPlanes(int $socioId, array $planIds): void
     {
         if ($socioId <= 0) {
             return;
