@@ -499,13 +499,7 @@ class CuotasController extends Controller
             return $this->fechaVencimientoPeriodoActual($tipoPeriodo);
         }
 
-        $stmtSocio = $db->prepare('SELECT fecha_ingreso FROM socios WHERE id = :id LIMIT 1');
-        $stmtSocio->bindValue(':id', $socioId, \PDO::PARAM_INT);
-        $stmtSocio->execute();
-        $fechaIngreso = (string) ($stmtSocio->fetchColumn() ?: '');
-
-        $base = $fechaIngreso !== '' ? new \DateTimeImmutable($fechaIngreso) : new \DateTimeImmutable('today');
-        $base = $base->modify('first day of this month');
+        $base = new \DateTimeImmutable(date('Y-01-01'));
 
         $stmtCount = $db->prepare("SELECT COUNT(*)
             FROM cuotas
