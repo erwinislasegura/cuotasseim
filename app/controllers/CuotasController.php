@@ -504,11 +504,9 @@ class CuotasController extends Controller
         $stmtCount = $db->prepare("SELECT COUNT(*)
             FROM cuotas
             WHERE socio_id = :socio_id
-              AND periodo_id = :periodo_id
               AND deleted_at IS NULL
               AND estado_cuota <> 'anulada'");
         $stmtCount->bindValue(':socio_id', $socioId, \PDO::PARAM_INT);
-        $stmtCount->bindValue(':periodo_id', $periodoId, \PDO::PARAM_INT);
         $stmtCount->execute();
         $cuotasRegistradas = (int) ($stmtCount->fetchColumn() ?: 0);
 
