@@ -54,11 +54,29 @@ class CuotasController extends Controller
                         static fn(array $cuota): bool => in_array((string) ($cuota['estado_cuota'] ?? ''), ['pendiente', 'vencida', 'abonada_parcial'], true)
                     ));
 
+                    $cuotasReferenciales = $this->obtenerCuotasReferencialesDesdePlanes($db, $selectedSocioId);
+
                     if (!empty($cuotasPendientes)) {
-                        $cuotaPorVencer = $cuotasPendientes[0];
-                        $otrasCuotas = array_slice($cuotasPendientes, 1);
+                        $cuotasSelector = $cuotasPendientes;
+
+                        $periodosConCuota = [];
+                        foreach ($cuotasPendientes as $cuotaPendiente) {
+                            $periodoIdCuota = (int) ($cuotaPendiente['periodo_id'] ?? 0);
+                            if ($periodoIdCuota > 0) {
+                                $periodosConCuota[$periodoIdCuota] = true;
+                            }
+                        }
+
+                        foreach ($cuotasReferenciales as $cuotaReferencial) {
+                            $periodoIdRef = (int) ($cuotaReferencial['periodo_id'] ?? 0);
+                            if ($periodoIdRef > 0 && !isset($periodosConCuota[$periodoIdRef])) {
+                                $cuotasSelector[] = $cuotaReferencial;
+                            }
+                        }
+
+                        $cuotaPorVencer = $cuotasSelector[0] ?? null;
+                        $otrasCuotas = array_slice($cuotasSelector, 1);
                     } else {
-                        $cuotasReferenciales = $this->obtenerCuotasReferencialesDesdePlanes($db, $selectedSocioId);
                         if (!empty($cuotasReferenciales)) {
                             $cuotaPorVencer = $cuotasReferenciales[0];
                             $otrasCuotas = array_slice($cuotasReferenciales, 1);
@@ -192,7 +210,7 @@ class CuotasController extends Controller
     /** @return array<int,array<string,mixed>> */
     private function obtenerCuotasOrdenadas(\PDO $db, int $socioId): array
     {
-        $stmt = $db->prepare("SELECT c.id,c.fecha_vencimiento,c.estado_cuota,c.monto_total,c.monto_pagado,c.saldo_pendiente,c.observacion,
+        $stmt = $db->prepare("SELECT c.id,c.periodo_id,c.fecha_vencimiento,c.estado_cuota,c.monto_total,c.monto_pagado,c.saldo_pendiente,c.observacion,
                 COALESCE(p.nombre_periodo, CONCAT('Plan #', c.periodo_id)) AS nombre_periodo,
                 COALESCE(p.tipo_periodo, 'mensual') AS tipo_periodo,
                 COALESCE(cc.nombre, 'Cuota') AS concepto,
