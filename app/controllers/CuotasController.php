@@ -333,6 +333,14 @@ class CuotasController extends Controller
             $numeroComprobante = 'CUO-' . date('Ymd-His') . '-' . random_int(100, 999);
             $periodoAPagar = $this->formatearPeriodoAPagarDesdeMes($cuota, $mesPeriodo, $fechaPago);
 
+            $stmtValidarDuplicado = $db->prepare("SELECT id FROM pagos WHERE socio_id = :socio_id AND periodo_a_pagar = :periodo_a_pagar AND estado_pago = 'aplicado' LIMIT 1");
+            $stmtValidarDuplicado->bindValue(':socio_id', $socioId, \PDO::PARAM_INT);
+            $stmtValidarDuplicado->bindValue(':periodo_a_pagar', $periodoAPagar);
+            $stmtValidarDuplicado->execute();
+            if ($stmtValidarDuplicado->fetch()) {
+                throw new \RuntimeException('El socio ya tiene un pago registrado para ese mes y año.');
+            }
+
             $stmtPago = $db->prepare("INSERT INTO pagos (socio_id, fecha_pago, monto_total, medio_pago_id, numero_comprobante, observacion, periodo_a_pagar, estado_pago, usuario_id)
                 VALUES (:socio_id, :fecha_pago, :monto_total, :medio_pago_id, :numero_comprobante, :observacion, :periodo_a_pagar, 'aplicado', :usuario_id)");
             $stmtPago->bindValue(':socio_id', $socioId, \PDO::PARAM_INT);
