@@ -37,7 +37,7 @@ class DeudasController extends Controller
                 $where[] = 's.deleted_at IS NULL';
             }
 
-            $sql = "SELECT c.id, c.fecha_vencimiento, c.estado_cuota, c.monto, c.saldo_pendiente,
+            $sql = "SELECT c.id, c.fecha_vencimiento, c.estado_cuota, c.monto_total, c.monto_pagado, c.saldo_pendiente,
                     COALESCE(s.numero_socio, '-') AS numero_socio,
                     COALESCE(s.nombre_completo, 'Socio sin nombre') AS nombre_completo,
                     COALESCE(s.rut, '-') AS rut,
