@@ -213,6 +213,20 @@ $periodoAPagarLabel = static function (array $cuota): string {
                   <input type="date" name="fecha_pago" class="form-control form-control-sm" value="<?= htmlspecialchars(date('Y-m-d')) ?>" required>
                 </div>
 
+
+                <div class="col-12">
+                  <label class="form-label">Mes a imputar</label>
+                  <select name="mes_periodo" class="form-select form-select-sm" required>
+                    <?php
+                      $mesesPeriodo = [1=>'Enero',2=>'Febrero',3=>'Marzo',4=>'Abril',5=>'Mayo',6=>'Junio',7=>'Julio',8=>'Agosto',9=>'Septiembre',10=>'Octubre',11=>'Noviembre',12=>'Diciembre'];
+                      $mesActualPeriodo = (int) date('n');
+                    ?>
+                    <?php foreach ($mesesPeriodo as $mesNum => $mesNombre): ?>
+                      <option value="<?= $mesNum ?>" <?= $mesNum === $mesActualPeriodo ? 'selected' : '' ?>><?= htmlspecialchars($mesNombre) ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
+
                 <div class="col-12 d-grid">
                   <button type="submit" class="btn btn-primary btn-sm">Registrar pago</button>
                 </div>

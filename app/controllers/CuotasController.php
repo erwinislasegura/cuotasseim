@@ -145,6 +145,7 @@ class CuotasController extends Controller
         $medioPagoId = max(0, (int) ($_POST['medio_pago_id'] ?? 0));
         $fechaPago = trim((string) ($_POST['fecha_pago'] ?? ''));
         $monto = (float) ($_POST['monto_pago'] ?? 0);
+        $mesPeriodo = max(1, min(12, (int) ($_POST['mes_periodo'] ?? date('n'))));
 
         if ($socioId <= 0 || $medioPagoId <= 0 || $fechaPago === '' || $monto <= 0) {
             $_SESSION['flash_error'] = 'Completa socio, medio de pago, fecha y monto válido.';
@@ -162,7 +163,7 @@ class CuotasController extends Controller
                 }
             }
 
-            $this->registrarPagoCuota($db, $socioId, $cuotaId, $medioPagoId, $fechaPago, $monto);
+            $this->registrarPagoCuota($db, $socioId, $cuotaId, $medioPagoId, $fechaPago, $monto, $mesPeriodo);
             $_SESSION['flash_success'] = 'Pago registrado correctamente.';
         } catch (Throwable $e) {
             $_SESSION['flash_error'] = $e->getMessage();
@@ -282,7 +283,7 @@ class CuotasController extends Controller
         return $stmt->fetchAll();
     }
 
-    private function registrarPagoCuota(\PDO $db, int $socioId, int $cuotaId, int $medioPagoId, string $fechaPago, float $monto): void
+    private function registrarPagoCuota(\PDO $db, int $socioId, int $cuotaId, int $medioPagoId, string $fechaPago, float $monto, int $mesPeriodo): void
     {
         $stmtCuota = $db->prepare("SELECT
                 c.id,
@@ -330,7 +331,7 @@ class CuotasController extends Controller
             $usuario = Auth::user();
             $usuarioId = (int) ($usuario['id'] ?? $_SESSION['user_id'] ?? 1);
             $numeroComprobante = 'CUO-' . date('Ymd-His') . '-' . random_int(100, 999);
-            $periodoAPagar = $this->formatearPeriodoAPagar($cuota);
+            $periodoAPagar = $this->formatearPeriodoAPagarDesdeMes($cuota, $mesPeriodo, $fechaPago);
 
             $stmtPago = $db->prepare("INSERT INTO pagos (socio_id, fecha_pago, monto_total, medio_pago_id, numero_comprobante, observacion, periodo_a_pagar, estado_pago, usuario_id)
                 VALUES (:socio_id, :fecha_pago, :monto_total, :medio_pago_id, :numero_comprobante, :observacion, :periodo_a_pagar, 'aplicado', :usuario_id)");
@@ -429,18 +430,11 @@ class CuotasController extends Controller
         return (int) $db->lastInsertId();
     }
 
-    private function formatearPeriodoAPagar(array $cuota): string
+    private function formatearPeriodoAPagarDesdeMes(array $cuota, int $mesPeriodo, string $fechaPago): string
     {
         $tipoPeriodo = trim((string) ($cuota['tipo_periodo'] ?? 'mensual'));
-        $fechaBaseTexto = (string) ($cuota['fecha_vencimiento'] ?? $cuota['fecha_inicio'] ?? 'now');
-        $mesBase = (int) date('n', strtotime($fechaBaseTexto));
-        if ($mesBase < 1 || $mesBase > 12) {
-            $mesBase = (int) date('n', strtotime((string) ($cuota['fecha_inicio'] ?? $cuota['fecha_vencimiento'] ?? 'now')));
-        }
-        $anioBase = (int) date('Y', strtotime($fechaBaseTexto));
-        if ($anioBase <= 0) {
-            $anioBase = (int) date('Y', strtotime((string) ($cuota['fecha_inicio'] ?? $cuota['fecha_vencimiento'] ?? 'now')));
-        }
+        $mesBase = max(1, min(12, $mesPeriodo));
+        $anioBase = (int) date('Y', strtotime($fechaPago !== '' ? $fechaPago : 'now'));
 
         $meses = [
             1 => 'enero', 2 => 'febrero', 3 => 'marzo', 4 => 'abril', 5 => 'mayo', 6 => 'junio',
@@ -450,7 +444,7 @@ class CuotasController extends Controller
         $semestres = [1 => 'uno', 2 => 'dos'];
 
         if ($tipoPeriodo === 'trimestral') {
-            $trimestre = (int) ceil(max(1, min(12, $mesBase)) / 3);
+            $trimestre = (int) ceil($mesBase / 3);
             return 'Trimestre ' . ($trimestres[$trimestre] ?? (string) $trimestre) . ' ' . $anioBase;
         }
         if ($tipoPeriodo === 'semestral') {
