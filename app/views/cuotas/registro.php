@@ -130,9 +130,7 @@ $periodoAPagarLabel = static function (array $cuota): string {
                   }
                   if (!empty($otrasCuotas ?? [])) {
                     foreach ($otrasCuotas as $cuotaPendiente) {
-                      if ((int) ($cuotaPendiente['id'] ?? 0) > 0) {
-                        $cuotasSeleccionables[] = $cuotaPendiente;
-                      }
+                      $cuotasSeleccionables[] = $cuotaPendiente;
                     }
                   }
                 ?>
