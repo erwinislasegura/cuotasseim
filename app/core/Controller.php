@@ -428,6 +428,8 @@ abstract class Controller
                     }
                 }
 
+
+
                 if (!$isReadOnly && $action === 'delete' && $id !== null && $id > 0) {
                     $deletedRecord = ModuleCatalog::findById($config['table'], $primaryKey, $id);
 

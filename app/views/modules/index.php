@@ -1169,3 +1169,16 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
     <?php endif; ?>
   });
 </script>
+
+<?php if (($route ?? '') === 'socios'): ?>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('button, a').forEach(function (el) {
+        var label = (el.textContent || '').trim().toLowerCase();
+        if (label.indexOf('asociar todos los planes a todos los socios') !== -1) {
+          el.remove();
+        }
+      });
+    });
+  </script>
+<?php endif; ?>
