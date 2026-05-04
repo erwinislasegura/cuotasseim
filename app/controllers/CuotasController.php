@@ -173,9 +173,7 @@ class CuotasController extends Controller
 
         if ($q === '') {
             $total = (int) ($db->query("SELECT COUNT(*) FROM socios WHERE deleted_at IS NULL AND activo = 1")->fetchColumn() ?: 0);
-            $stmt = $db->prepare("SELECT id, numero_socio, nombre_completo, rut, correo, telefono FROM socios WHERE deleted_at IS NULL AND activo = 1 ORDER BY nombre_completo ASC LIMIT :limit OFFSET :offset");
-            $stmt->bindValue(':limit', $perPage, \PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+            $stmt = $db->prepare("SELECT id, numero_socio, nombre_completo, rut, correo, telefono FROM socios WHERE deleted_at IS NULL AND activo = 1 ORDER BY nombre_completo ASC LIMIT {$perPage} OFFSET {$offset}");
             $stmt->execute();
             return ['items' => $stmt->fetchAll() ?: [], 'total' => $total];
         }
@@ -195,7 +193,7 @@ class CuotasController extends Controller
               AND activo = 1
               AND (nombre_completo LIKE :term OR rut LIKE :term)
             ORDER BY nombre_completo ASC
-            LIMIT :limit OFFSET :offset");
+            LIMIT {$perPage} OFFSET {$offset}");
         $stmt->bindValue(':term', '%' . $q . '%');
         $stmt->bindValue(':limit', $perPage, \PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
