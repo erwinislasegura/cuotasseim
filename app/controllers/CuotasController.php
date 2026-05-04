@@ -31,6 +31,7 @@ class CuotasController extends Controller
         $otrasCuotas = [];
         $mediosPago = [];
         $sinPlanAsociado = false;
+        $planesSocio = [];
         $error = null;
 
         try {
@@ -46,6 +47,7 @@ class CuotasController extends Controller
                 $socio = $this->obtenerSocio($db, $selectedSocioId);
 
                 if ($socio !== null) {
+                    $planesSocio = $this->obtenerPlanesSocio($db, $selectedSocioId);
                     $cuotas = $this->obtenerCuotasOrdenadas($db, $selectedSocioId);
                     $cuotasPendientes = array_values(array_filter(
                         $cuotas,
@@ -56,8 +58,12 @@ class CuotasController extends Controller
                         $cuotaPorVencer = $cuotasPendientes[0];
                         $otrasCuotas = array_slice($cuotasPendientes, 1);
                     } else {
-                        $cuotaPorVencer = $this->obtenerCuotaActualDesdePlan($db, $selectedSocioId);
-                        $sinPlanAsociado = $cuotaPorVencer === null;
+                        $cuotasReferenciales = $this->obtenerCuotasReferencialesDesdePlanes($db, $selectedSocioId);
+                        if (!empty($cuotasReferenciales)) {
+                            $cuotaPorVencer = $cuotasReferenciales[0];
+                            $otrasCuotas = array_slice($cuotasReferenciales, 1);
+                        }
+                        $sinPlanAsociado = empty($cuotasReferenciales);
                     }
                 }
             }
@@ -80,6 +86,7 @@ class CuotasController extends Controller
             'otrasCuotas' => $otrasCuotas,
             'mediosPago' => $mediosPago,
             'sinPlanAsociado' => $sinPlanAsociado,
+            'planesSocio' => $planesSocio,
             'token' => Csrf::token(),
             'flashSuccess' => $flashSuccess,
             'flashError' => $flashError,
@@ -95,7 +102,7 @@ class CuotasController extends Controller
         }
 
         $socioId = max(0, (int) ($_POST['socio_id'] ?? 0));
-        $cuotaId = max(0, (int) ($_POST['cuota_id'] ?? 0));
+        $cuotaId = (int) ($_POST['cuota_id'] ?? 0);
         $medioPagoId = max(0, (int) ($_POST['medio_pago_id'] ?? 0));
         $fechaPago = trim((string) ($_POST['fecha_pago'] ?? ''));
         $monto = (float) ($_POST['monto_pago'] ?? 0);
@@ -109,7 +116,8 @@ class CuotasController extends Controller
             $db = Database::connection();
 
             if ($cuotaId <= 0) {
-                $cuotaId = $this->crearCuotaDesdePlanActual($db, $socioId);
+                $periodoIdReferencia = abs($cuotaId);
+                $cuotaId = $this->crearCuotaDesdePlanActual($db, $socioId, $periodoIdReferencia > 0 ? $periodoIdReferencia : null);
                 if ($cuotaId <= 0) {
                     throw new \RuntimeException('No se pudo determinar una cuota para registrar el pago.');
                 }
@@ -160,6 +168,25 @@ class CuotasController extends Controller
 
         $row = $stmtSocio->fetch();
         return $row ?: null;
+    }
+
+
+    /** @return array<int,array<string,mixed>> */
+    private function obtenerPlanesSocio(\PDO $db, int $socioId): array
+    {
+        $stmt = $db->prepare("SELECT p.id, p.nombre_periodo, p.tipo_periodo
+            FROM socio_planes sp
+            INNER JOIN periodos p ON p.id = sp.periodo_id
+            WHERE sp.socio_id = :socio_id
+            ORDER BY sp.id DESC");
+        $stmt->bindValue(':socio_id', $socioId, \PDO::PARAM_INT);
+
+        try {
+            $stmt->execute();
+            return $stmt->fetchAll() ?: [];
+        } catch (Throwable) {
+            return [];
+        }
     }
 
     /** @return array<int,array<string,mixed>> */
@@ -282,15 +309,22 @@ class CuotasController extends Controller
         }
     }
 
-    private function crearCuotaDesdePlanActual(\PDO $db, int $socioId): int
+    private function crearCuotaDesdePlanActual(\PDO $db, int $socioId, ?int $periodoId = null): int
     {
-        $stmt = $db->prepare("SELECT sp.periodo_id, p.nombre_periodo, p.tipo_periodo, p.monto_a_pagar
+        $sql = "SELECT sp.periodo_id, p.nombre_periodo, p.tipo_periodo, p.monto_a_pagar
             FROM socio_planes sp
             INNER JOIN periodos p ON p.id = sp.periodo_id
-            WHERE sp.socio_id = :socio_id
-            ORDER BY sp.id DESC
-            LIMIT 1");
+            WHERE sp.socio_id = :socio_id";
+        if ($periodoId !== null && $periodoId > 0) {
+            $sql .= " AND sp.periodo_id = :periodo_id";
+        }
+        $sql .= " ORDER BY sp.id DESC LIMIT 1";
+
+        $stmt = $db->prepare($sql);
         $stmt->bindValue(':socio_id', $socioId, \PDO::PARAM_INT);
+        if ($periodoId !== null && $periodoId > 0) {
+            $stmt->bindValue(':periodo_id', $periodoId, \PDO::PARAM_INT);
+        }
         $stmt->execute();
         $plan = $stmt->fetch();
 
@@ -369,50 +403,55 @@ class CuotasController extends Controller
         return 'Mes ' . ($meses[$mesBase] ?? (string) $mesBase) . ' ' . $anioBase;
     }
 
-    private function obtenerCuotaActualDesdePlan(\PDO $db, int $socioId): ?array
+    /** @return array<int,array<string,mixed>> */
+    private function obtenerCuotasReferencialesDesdePlanes(\PDO $db, int $socioId): array
     {
         $stmt = $db->prepare("SELECT p.id AS periodo_id, p.nombre_periodo, p.tipo_periodo, p.monto_a_pagar
             FROM socio_planes sp
             INNER JOIN periodos p ON p.id = sp.periodo_id
             WHERE sp.socio_id = :socio_id
-            ORDER BY sp.id DESC
-            LIMIT 1");
+            ORDER BY sp.id DESC");
         $stmt->bindValue(':socio_id', $socioId, \PDO::PARAM_INT);
 
         try {
             $stmt->execute();
-            $plan = $stmt->fetch();
+            $planes = $stmt->fetchAll() ?: [];
         } catch (Throwable) {
-            return null;
+            return [];
         }
 
-        if (!$plan) {
-            return null;
+        if (empty($planes)) {
+            return [];
         }
 
-        $tipo = (string) ($plan['tipo_periodo'] ?? 'mensual');
-        $monto = (float) ($plan['monto_a_pagar'] ?? 0);
+        $cuotas = [];
+        foreach ($planes as $plan) {
+            $tipo = (string) ($plan['tipo_periodo'] ?? 'mensual');
+            $monto = (float) ($plan['monto_a_pagar'] ?? 0);
+            $periodoId = (int) ($plan['periodo_id'] ?? 0);
+            if ($periodoId <= 0) {
+                continue;
+            }
 
-        $fechaVencimiento = $this->obtenerFechaVencimientoProgresiva(
-            $db,
-            $socioId,
-            (int) ($plan['periodo_id'] ?? 0),
-            $tipo
-        );
+            $fechaVencimiento = $this->obtenerFechaVencimientoProgresiva($db, $socioId, $periodoId, $tipo);
 
-        return [
-            'id' => null,
-            'fecha_vencimiento' => $fechaVencimiento,
-            'estado_cuota' => 'pendiente',
-            'monto_total' => $monto,
-            'monto_pagado' => 0,
-            'saldo_pendiente' => $monto,
-            'observacion' => 'Cuota referencial del plan actual (aún no generada en cuotas).',
-            'nombre_periodo' => (string) ($plan['nombre_periodo'] ?? 'Plan actual'),
-            'tipo_periodo' => $tipo,
-            'concepto' => 'Cuota actual',
-            'es_referencia_plan' => 1,
-        ];
+            $cuotas[] = [
+                'id' => -$periodoId,
+                'periodo_id' => $periodoId,
+                'fecha_vencimiento' => $fechaVencimiento,
+                'estado_cuota' => 'pendiente',
+                'monto_total' => $monto,
+                'monto_pagado' => 0,
+                'saldo_pendiente' => $monto,
+                'observacion' => 'Cuota referencial del plan actual (aún no generada en cuotas).',
+                'nombre_periodo' => (string) ($plan['nombre_periodo'] ?? 'Plan actual'),
+                'tipo_periodo' => $tipo,
+                'concepto' => 'Cuota actual',
+                'es_referencia_plan' => 1,
+            ];
+        }
+
+        return $cuotas;
     }
 
     private function fechaVencimientoPeriodoActual(string $tipoPeriodo): string
