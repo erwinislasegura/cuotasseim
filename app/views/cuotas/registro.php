@@ -46,8 +46,12 @@ $periodoAPagarLabel = static function (array $cuota): string {
     <div class="card h-100 cuotas-card-compact">
       <div class="card-header py-2 d-flex justify-content-between align-items-center gap-2 flex-wrap">
         <strong class="card-title mb-0">Socios</strong>
-        <form method="get" action="<?= htmlspecialchars(url('cuotas')) ?>" class="d-flex gap-2 flex-wrap cuotas-search-form">
-          <input type="text" id="q" name="q" class="form-control form-control-sm" value="<?= htmlspecialchars((string) ($q ?? '')) ?>" placeholder="Buscar por nombre o RUT">
+        <form method="get" action="<?= htmlspecialchars(url('cuotas')) ?>" class="d-flex gap-2 flex-wrap cuotas-search-form js-socios-search-form">
+          <input type="text" id="q" name="q" class="form-control form-control-sm js-socios-search-input" value="<?= htmlspecialchars((string) ($q ?? '')) ?>" placeholder="Buscar por nombre o RUT" autocomplete="off">
+          <input type="hidden" name="page" value="1">
+          <?php if (!empty($selectedSocioId ?? 0)): ?>
+            <input type="hidden" name="socio_id" value="<?= (int) ($selectedSocioId ?? 0) ?>">
+          <?php endif; ?>
           <button type="submit" class="btn btn-primary btn-sm">Buscar</button>
           <a href="<?= htmlspecialchars(url('cuotas')) ?>" class="btn btn-light btn-sm">Limpiar</a>
         </form>
@@ -294,4 +298,29 @@ $periodoAPagarLabel = static function (array $cuota): string {
     cuotaSelector.addEventListener('change', actualizarMontoDesdePeriodo);
     actualizarMontoDesdePeriodo();
   })();
+
+  (function () {
+    const searchForm = document.querySelector('.js-socios-search-form');
+    const searchInput = document.querySelector('.js-socios-search-input');
+    if (!searchForm || !searchInput) {
+      return;
+    }
+
+    let debounceTimer = null;
+    const submitSearch = function () {
+      if (typeof searchForm.requestSubmit === 'function') {
+        searchForm.requestSubmit();
+        return;
+      }
+      searchForm.submit();
+    };
+
+    searchInput.addEventListener('input', function () {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+      debounceTimer = setTimeout(submitSearch, 350);
+    });
+  })();
+
 </script>
