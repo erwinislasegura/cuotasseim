@@ -624,6 +624,13 @@ $currentHighlight = $moduleHighlights[(string) ($route ?? '')] ?? null;
         </a>
       </div>
     <?php endif; ?>
+    <?php if (($route ?? '') === 'socios' && !($isReadOnly ?? false)): ?>
+      <form method="post" action="<?= htmlspecialchars(url($route ?? '')) ?>" onsubmit="return confirm('¿Asociar TODOS los planes a TODOS los socios? Esta acción reemplaza asociaciones existentes.');">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars($token ?? '') ?>">
+        <input type="hidden" name="_action" value="associate_all_plans">
+        <button class="btn btn-warning btn-sm" type="submit">Asociar todos los planes a todos los socios</button>
+      </form>
+    <?php endif; ?>
     <form method="get" action="<?= htmlspecialchars(url($route ?? '')) ?>" class="row gx-2 gy-2 align-items-end <?= ($route ?? '') === 'reportes' ? 'report-filters' : '' ?>">
       <div class="col-sm-auto filter-search">
         <label class="form-label">Buscar</label>
