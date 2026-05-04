@@ -46,8 +46,12 @@ $periodoAPagarLabel = static function (array $cuota): string {
     <div class="card h-100 cuotas-card-compact">
       <div class="card-header py-2 d-flex justify-content-between align-items-center gap-2 flex-wrap">
         <strong class="card-title mb-0">Socios</strong>
-        <form method="get" action="<?= htmlspecialchars(url('cuotas')) ?>" class="d-flex gap-2 flex-wrap cuotas-search-form">
-          <input type="text" id="q" name="q" class="form-control form-control-sm" value="<?= htmlspecialchars((string) ($q ?? '')) ?>" placeholder="Buscar por nombre o RUT">
+        <form method="get" action="<?= htmlspecialchars(url('cuotas')) ?>" class="d-flex gap-2 flex-wrap cuotas-search-form js-socios-search-form">
+          <input type="text" id="q" name="q" class="form-control form-control-sm js-socios-search-input" value="<?= htmlspecialchars((string) ($q ?? '')) ?>" placeholder="Buscar por nombre o RUT" autocomplete="off">
+          <input type="hidden" name="page" value="1">
+          <?php if (!empty($selectedSocioId ?? 0)): ?>
+            <input type="hidden" name="socio_id" value="<?= (int) ($selectedSocioId ?? 0) ?>">
+          <?php endif; ?>
           <button type="submit" class="btn btn-primary btn-sm">Buscar</button>
           <a href="<?= htmlspecialchars(url('cuotas')) ?>" class="btn btn-light btn-sm">Limpiar</a>
         </form>
@@ -55,7 +59,7 @@ $periodoAPagarLabel = static function (array $cuota): string {
       <div class="card-body py-2">
         <?php if (!empty($socios ?? [])): ?>
           <div class="table-responsive cuotas-socios-scroll">
-            <table class="table table-sm table-hover mb-0">
+            <table class="table table-sm table-hover mb-0 cuotas-table-compact">
               <thead>
                 <tr>
                   <th>N°</th>
@@ -72,7 +76,7 @@ $periodoAPagarLabel = static function (array $cuota): string {
                     <td><?= htmlspecialchars((string) ($item['nombre_completo'] ?? '')) ?></td>
                     <td><?= htmlspecialchars((string) ($item['rut'] ?? '')) ?></td>
                     <td class="text-end">
-                      <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(url('cuotas') . '?q=' . urlencode((string) ($q ?? '')) . '&socio_id=' . (int) ($item['id'] ?? 0)) ?>">
+                      <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(url('cuotas') . '?q=' . urlencode((string) ($q ?? '')) . '&socio_id=' . (int) ($item['id'] ?? 0) . '&page=' . (int) ($page ?? 1)) ?>">
                         <?= $isCurrent ? 'Activo' : 'Elegir' ?>
                       </a>
                     </td>
@@ -81,6 +85,18 @@ $periodoAPagarLabel = static function (array $cuota): string {
               </tbody>
             </table>
           </div>
+          <div class="small text-muted mt-2">Mostrando hasta <?= (int) ($perPage ?? 50) ?> registros por página · Total: <?= (int) ($sociosTotal ?? 0) ?></div>
+          <?php if (($sociosPages ?? 1) > 1): ?>
+            <nav class="mt-2" aria-label="Paginación socios">
+              <ul class="pagination pagination-sm mb-0">
+                <?php for ($p = 1; $p <= (int) ($sociosPages ?? 1); $p++): ?>
+                  <li class="page-item <?= (int) ($page ?? 1) === $p ? 'active' : '' ?>">
+                    <a class="page-link" href="<?= htmlspecialchars(url('cuotas') . '?q=' . urlencode((string) ($q ?? '')) . '&socio_id=' . (int) ($selectedSocioId ?? 0) . '&page=' . $p) ?>"><?= $p ?></a>
+                  </li>
+                <?php endfor; ?>
+              </ul>
+            </nav>
+          <?php endif; ?>
         <?php else: ?>
           <p class="small text-muted mb-0">No hay socios para mostrar con la búsqueda actual.</p>
         <?php endif; ?>
@@ -105,6 +121,10 @@ $periodoAPagarLabel = static function (array $cuota): string {
               <?php endif; ?>
             </div>
 
+            <div class="mb-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#planesSocioModal">Ver detalle de planes</button>
+            </div>
+
             <?php if (!empty($sinPlanAsociado ?? false)): ?>
               <div class="alert alert-warning small mb-2">
                 Este socio no tiene un plan asociado. Debes asociarle un plan para registrar el pago de cuota.
@@ -125,9 +145,7 @@ $periodoAPagarLabel = static function (array $cuota): string {
                   }
                   if (!empty($otrasCuotas ?? [])) {
                     foreach ($otrasCuotas as $cuotaPendiente) {
-                      if ((int) ($cuotaPendiente['id'] ?? 0) > 0) {
-                        $cuotasSeleccionables[] = $cuotaPendiente;
-                      }
+                      $cuotasSeleccionables[] = $cuotaPendiente;
                     }
                   }
                 ?>
@@ -225,6 +243,32 @@ $periodoAPagarLabel = static function (array $cuota): string {
   </div>
 </div>
 
+
+<div class="modal fade" id="planesSocioModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Detalle de planes del socio</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <?php if (!empty($planesSocio ?? [])): ?>
+          <ol class="mb-0 ps-3">
+            <?php foreach ((array) $planesSocio as $planItem): ?>
+              <li class="mb-2">
+                <strong><?= htmlspecialchars((string) ($planItem['nombre_periodo'] ?? 'Plan')) ?></strong><br>
+                <small class="text-muted">Tipo: <?= htmlspecialchars((string) ($planItem['tipo_periodo'] ?? '-')) ?></small>
+              </li>
+            <?php endforeach; ?>
+          </ol>
+        <?php else: ?>
+          <p class="text-muted mb-0">Este socio no tiene planes configurados.</p>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
   (function () {
     const cuotaSelector = document.querySelector('.js-cuota-selector');
@@ -249,4 +293,29 @@ $periodoAPagarLabel = static function (array $cuota): string {
     cuotaSelector.addEventListener('change', actualizarMontoDesdePeriodo);
     actualizarMontoDesdePeriodo();
   })();
+
+  (function () {
+    const searchForm = document.querySelector('.js-socios-search-form');
+    const searchInput = document.querySelector('.js-socios-search-input');
+    if (!searchForm || !searchInput) {
+      return;
+    }
+
+    let debounceTimer = null;
+    const submitSearch = function () {
+      if (typeof searchForm.requestSubmit === 'function') {
+        searchForm.requestSubmit();
+        return;
+      }
+      searchForm.submit();
+    };
+
+    searchInput.addEventListener('input', function () {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+      debounceTimer = setTimeout(submitSearch, 350);
+    });
+  })();
+
 </script>
