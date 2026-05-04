@@ -178,9 +178,6 @@ $periodoAPagarLabel = static function (array $cuota): string {
                           $venceItem = !empty($cuotaItem['fecha_vencimiento']) ? human_date((string) $cuotaItem['fecha_vencimiento']) : '-';
                           $labelPeriodo = trim((string) ($cuotaItem['nombre_periodo'] ?? ('Cuota #' . $cuotaId)));
                           $label = $labelPeriodo . ' · ' . $periodoTextoItem . ' · Vence: ' . $venceItem . ' · Saldo: ' . money($saldoPendienteItem);
-                          if ($cuotaId <= 0) {
-                            $label .= ' · (se generará automáticamente)';
-                          }
                         ?>
                         <option
                           value="<?= $cuotaId ?>"
@@ -344,9 +341,6 @@ $periodoAPagarLabel = static function (array $cuota): string {
         const saldo = parseFloat(opt.dataset.saldo || '0');
         const auto = opt.dataset.auto === '1';
         let label = nombre + ' · ' + periodoTextoPorTipo(tipo, mes, year) + ' · Vence: ' + vence + ' · Saldo: ' + saldo.toFixed(2);
-        if (auto) {
-          label += ' · (se generará automáticamente)';
-        }
         opt.textContent = label;
       });
     };
