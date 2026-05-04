@@ -142,6 +142,18 @@ $periodoAPagarLabel = static function (array $cuota): string {
                 <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($token ?? '')) ?>">
                 <input type="hidden" name="q" value="<?= htmlspecialchars((string) ($q ?? '')) ?>">
                 <input type="hidden" name="socio_id" value="<?= (int) ($socio['id'] ?? 0) ?>">
+                <div class="col-12">
+                  <label class="form-label">Mes a imputar</label>
+                  <select name="mes_periodo" class="form-select form-select-sm js-mes-periodo" required>
+                    <?php
+                      $mesesPeriodo = [1=>'Enero',2=>'Febrero',3=>'Marzo',4=>'Abril',5=>'Mayo',6=>'Junio',7=>'Julio',8=>'Agosto',9=>'Septiembre',10=>'Octubre',11=>'Noviembre',12=>'Diciembre'];
+                      $mesActualPeriodo = (int) date('n');
+                    ?>
+                    <?php foreach ($mesesPeriodo as $mesNum => $mesNombre): ?>
+                      <option value="<?= $mesNum ?>" <?= $mesNum === $mesActualPeriodo ? 'selected' : '' ?>><?= htmlspecialchars($mesNombre) ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
                 <?php
                   $cuotasSeleccionables = [];
                   if (!empty($cuotaPorVencer)) {
@@ -156,7 +168,7 @@ $periodoAPagarLabel = static function (array $cuota): string {
 
                 <?php if (!empty($cuotasSeleccionables)): ?>
                   <div class="col-12">
-                    <label class="form-label">Periodo a pagar</label>
+                    <label class="form-label">Cuota/Plan a pagar</label>
                     <select name="cuota_id" class="form-select form-select-sm js-cuota-selector" required>
                       <?php foreach ($cuotasSeleccionables as $index => $cuotaItem): ?>
                         <?php
@@ -166,13 +178,14 @@ $periodoAPagarLabel = static function (array $cuota): string {
                           $venceItem = !empty($cuotaItem['fecha_vencimiento']) ? human_date((string) $cuotaItem['fecha_vencimiento']) : '-';
                           $labelPeriodo = trim((string) ($cuotaItem['nombre_periodo'] ?? ('Cuota #' . $cuotaId)));
                           $label = $labelPeriodo . ' · ' . $periodoTextoItem . ' · Vence: ' . $venceItem . ' · Saldo: ' . money($saldoPendienteItem);
-                          if ($cuotaId <= 0) {
-                            $label .= ' · (se generará automáticamente)';
-                          }
                         ?>
                         <option
                           value="<?= $cuotaId ?>"
                           data-saldo="<?= htmlspecialchars((string) $saldoPendienteItem) ?>"
+                          data-tipo-periodo="<?= htmlspecialchars((string) ($cuotaItem['tipo_periodo'] ?? 'mensual')) ?>"
+                          data-nombre-periodo="<?= htmlspecialchars($labelPeriodo) ?>"
+                          data-vence="<?= htmlspecialchars($venceItem) ?>"
+                          data-auto="<?= $cuotaId <= 0 ? '1' : '0' ?>"
                           <?= $index === 0 ? 'selected' : '' ?>
                         >
                           <?= htmlspecialchars($label) ?>
@@ -183,6 +196,11 @@ $periodoAPagarLabel = static function (array $cuota): string {
                 <?php else: ?>
                   <input type="hidden" name="cuota_id" value="<?= (int) ($cuotaPorVencer['id'] ?? 0) ?>">
                 <?php endif; ?>
+
+                <div class="col-12">
+                  <label class="form-label">Periodo a pagar</label>
+                  <input type="text" class="form-control form-control-sm js-periodo-preview" value="" readonly>
+                </div>
 
                 <div class="col-12">
                   <label class="form-label">Monto (editable)</label>
@@ -212,6 +230,7 @@ $periodoAPagarLabel = static function (array $cuota): string {
                   <label class="form-label">Fecha de pago</label>
                   <input type="date" name="fecha_pago" class="form-control form-control-sm" value="<?= htmlspecialchars(date('Y-m-d')) ?>" required>
                 </div>
+
 
                 <div class="col-12 d-grid">
                   <button type="submit" class="btn btn-primary btn-sm">Registrar pago</button>
@@ -286,10 +305,57 @@ $periodoAPagarLabel = static function (array $cuota): string {
 <script>
   (function () {
     const cuotaSelector = document.querySelector('.js-cuota-selector');
+    const mesSelector = document.querySelector('.js-mes-periodo');
+    const periodoPreview = document.querySelector('.js-periodo-preview');
     const montoInput = document.querySelector('.js-monto-pago');
     if (!cuotaSelector || !montoInput) {
       return;
     }
+
+    
+    
+    const periodoTextoPorTipo = function (tipo, mes, year) {
+      const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      if (tipo === 'trimestral') {
+        return 'Trimestre ' + Math.ceil(Math.max(1, Math.min(12, mes)) / 3) + ' ' + year;
+      }
+      if (tipo === 'semestral') {
+        return 'Semestre ' + (mes <= 6 ? '1' : '2') + ' ' + year;
+      }
+      if (tipo === 'anual') {
+        return 'Año ' + year;
+      }
+      return 'Mes ' + (meses[Math.max(1, Math.min(12, mes)) - 1] || mes) + ' ' + year;
+    };
+
+    const actualizarOpcionesCuotaPorMes = function () {
+      if (!cuotaSelector || !mesSelector) {
+        return;
+      }
+      const mes = parseInt(mesSelector.value || '1', 10);
+      const year = new Date().getFullYear();
+      Array.from(cuotaSelector.options).forEach(function (opt) {
+        const tipo = (opt.dataset.tipoPeriodo || 'mensual').toLowerCase();
+        const nombre = opt.dataset.nombrePeriodo || 'Cuota';
+        const vence = opt.dataset.vence || '-';
+        const saldo = parseFloat(opt.dataset.saldo || '0');
+        const auto = opt.dataset.auto === '1';
+        let label = nombre + ' · ' + periodoTextoPorTipo(tipo, mes, year) + ' · Vence: ' + vence + ' · Saldo: ' + saldo.toFixed(2);
+        opt.textContent = label;
+      });
+    };
+
+    const actualizarPeriodoPreview = function () {
+      if (!periodoPreview || !mesSelector) {
+        return;
+      }
+      const mes = parseInt(mesSelector.value || '1', 10);
+      const option = cuotaSelector ? cuotaSelector.options[cuotaSelector.selectedIndex] : null;
+      const tipo = (option?.dataset?.tipoPeriodo || 'mensual').toLowerCase();
+      const year = new Date().getFullYear();
+      let texto = periodoTextoPorTipo(tipo, mes, year);
+      periodoPreview.value = texto;
+    };
 
     const actualizarMontoDesdePeriodo = function () {
       const option = cuotaSelector.options[cuotaSelector.selectedIndex];
@@ -304,8 +370,11 @@ $periodoAPagarLabel = static function (array $cuota): string {
       montoInput.value = String(saldo);
     };
 
-    cuotaSelector.addEventListener('change', actualizarMontoDesdePeriodo);
+    cuotaSelector.addEventListener('change', function () { actualizarMontoDesdePeriodo(); actualizarPeriodoPreview(); });
+    mesSelector?.addEventListener('change', function () { actualizarOpcionesCuotaPorMes(); actualizarPeriodoPreview(); });
+    actualizarOpcionesCuotaPorMes();
     actualizarMontoDesdePeriodo();
+    actualizarPeriodoPreview();
   })();
 
   (function () {
