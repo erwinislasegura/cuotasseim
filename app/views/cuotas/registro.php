@@ -186,6 +186,9 @@ $periodoAPagarLabel = static function (array $cuota): string {
                           value="<?= $cuotaId ?>"
                           data-saldo="<?= htmlspecialchars((string) $saldoPendienteItem) ?>"
                           data-tipo-periodo="<?= htmlspecialchars((string) ($cuotaItem['tipo_periodo'] ?? 'mensual')) ?>"
+                          data-nombre-periodo="<?= htmlspecialchars($labelPeriodo) ?>"
+                          data-vence="<?= htmlspecialchars($venceItem) ?>"
+                          data-auto="<?= $cuotaId <= 0 ? '1' : '0' ?>"
                           <?= $index === 0 ? 'selected' : '' ?>
                         >
                           <?= htmlspecialchars($label) ?>
@@ -313,6 +316,41 @@ $periodoAPagarLabel = static function (array $cuota): string {
     }
 
     
+    
+    const periodoTextoPorTipo = function (tipo, mes, year) {
+      const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      if (tipo === 'trimestral') {
+        return 'Trimestre ' + Math.ceil(Math.max(1, Math.min(12, mes)) / 3) + ' ' + year;
+      }
+      if (tipo === 'semestral') {
+        return 'Semestre ' + (mes <= 6 ? '1' : '2') + ' ' + year;
+      }
+      if (tipo === 'anual') {
+        return 'Año ' + year;
+      }
+      return 'Mes ' + (meses[Math.max(1, Math.min(12, mes)) - 1] || mes) + ' ' + year;
+    };
+
+    const actualizarOpcionesCuotaPorMes = function () {
+      if (!cuotaSelector || !mesSelector) {
+        return;
+      }
+      const mes = parseInt(mesSelector.value || '1', 10);
+      const year = new Date().getFullYear();
+      Array.from(cuotaSelector.options).forEach(function (opt) {
+        const tipo = (opt.dataset.tipoPeriodo || 'mensual').toLowerCase();
+        const nombre = opt.dataset.nombrePeriodo || 'Cuota';
+        const vence = opt.dataset.vence || '-';
+        const saldo = parseFloat(opt.dataset.saldo || '0');
+        const auto = opt.dataset.auto === '1';
+        let label = nombre + ' · ' + periodoTextoPorTipo(tipo, mes, year) + ' · Vence: ' + vence + ' · Saldo: ' + saldo.toFixed(2);
+        if (auto) {
+          label += ' · (se generará automáticamente)';
+        }
+        opt.textContent = label;
+      });
+    };
+
     const actualizarPeriodoPreview = function () {
       if (!periodoPreview || !mesSelector) {
         return;
@@ -321,15 +359,7 @@ $periodoAPagarLabel = static function (array $cuota): string {
       const option = cuotaSelector ? cuotaSelector.options[cuotaSelector.selectedIndex] : null;
       const tipo = (option?.dataset?.tipoPeriodo || 'mensual').toLowerCase();
       const year = new Date().getFullYear();
-      const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-      let texto = 'Mes ' + (meses[Math.max(1, Math.min(12, mes)) - 1] || mes) + ' ' + year;
-      if (tipo === 'trimestral') {
-        texto = 'Trimestre ' + Math.ceil(Math.max(1, Math.min(12, mes)) / 3) + ' ' + year;
-      } else if (tipo === 'semestral') {
-        texto = 'Semestre ' + (mes <= 6 ? '1' : '2') + ' ' + year;
-      } else if (tipo === 'anual') {
-        texto = 'Año ' + year;
-      }
+      let texto = periodoTextoPorTipo(tipo, mes, year);
       periodoPreview.value = texto;
     };
 
@@ -347,7 +377,8 @@ $periodoAPagarLabel = static function (array $cuota): string {
     };
 
     cuotaSelector.addEventListener('change', function () { actualizarMontoDesdePeriodo(); actualizarPeriodoPreview(); });
-    mesSelector?.addEventListener('change', actualizarPeriodoPreview);
+    mesSelector?.addEventListener('change', function () { actualizarOpcionesCuotaPorMes(); actualizarPeriodoPreview(); });
+    actualizarOpcionesCuotaPorMes();
     actualizarMontoDesdePeriodo();
     actualizarPeriodoPreview();
   })();
